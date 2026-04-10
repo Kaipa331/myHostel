@@ -3313,14 +3313,14 @@ function MainApp() {
             >
               {/* Hero Section */}
               <section className="relative h-[65vh] md:h-[85vh] flex items-center overflow-hidden">
-                <AnimatePresence>
+                <AnimatePresence initial={false}>
                   <motion.div 
                     key={heroImageIndex}
                     initial={{ x: '100%' }}
                     animate={{ x: 0 }}
                     exit={{ x: '-100%' }}
-                    transition={{ type: 'tween', duration: 0.8, ease: 'circInOut' }}
-                    className="absolute inset-0 z-0"
+                    transition={{ type: 'tween', duration: 1.2, ease: 'easeInOut' }}
+                    className="absolute inset-0 z-0 bg-primary"
                   >
                     <img 
                       src={heroImages[heroImageIndex]} 
