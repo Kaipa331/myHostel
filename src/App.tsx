@@ -320,8 +320,8 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout, isOpen, onClose }: 
             <div className="flex items-center cursor-pointer" onClick={() => { onViewChange('home'); onClose?.(); }}>
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3 shadow-lg overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1592591502238-028381bb5017?auto=format&fit=crop&q=80&w=100" 
-                  alt="MyHostel Logo" 
+                  src="/logo.jpg" 
+                  alt="myHostel Logo" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
@@ -685,7 +685,7 @@ const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onVi
         return (
           <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow p-8">
             <h2 className="text-2xl font-black text-primary mb-8">System Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Platform Config</h3>
                 <div className="space-y-4">
@@ -766,7 +766,7 @@ const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onVi
               </div>
             </section>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-8">
                 <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow p-8">
                   <h2 className="text-xl font-black text-primary mb-6 flex items-center gap-2">
@@ -974,7 +974,7 @@ const LandlordDashboard = ({ user, hostels, activeView, onViewChange, onEdit, on
           <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow p-8">
             <h2 className="text-2xl font-black text-primary mb-8">Landlord Settings</h2>
             <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Payment Methods</h3>
                   <div className="space-y-3">
@@ -1026,7 +1026,7 @@ const LandlordDashboard = ({ user, hostels, activeView, onViewChange, onEdit, on
               <CheckCircle2 className="absolute -bottom-8 -right-8 w-48 h-48 text-tertiary/10 -rotate-12" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-8">
                 <section>
                   <div className="flex justify-between items-center mb-6">
@@ -1447,7 +1447,7 @@ const StudentDashboard = ({
         return (
           <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow p-8">
             <h2 className="text-2xl font-black text-primary mb-8">Account Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Profile Preferences</h3>
                 <div className="space-y-4">
@@ -1507,7 +1507,7 @@ const StudentDashboard = ({
               <AlertCircle className="absolute -bottom-8 -right-8 w-48 h-48 text-secondary-fixed/10 -rotate-12" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-8">
                 <section>
                   <div className="flex justify-between items-center mb-6">
@@ -1637,27 +1637,17 @@ const Navbar = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-16">
         <div className="flex items-center gap-4">
-          {canGoBack && (
-            <button 
-              onClick={onBack}
-              className="p-2 text-on-surface-variant hover:text-primary transition-colors interactive-scale"
-              title="Go Back"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-          )}
           <div className="flex items-center cursor-pointer interactive-scale" onClick={() => { onViewChange('home'); setIsMenuOpen(false); }}>
             <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mr-3 shadow-lg overflow-hidden">
               <img 
-                src="https://images.unsplash.com/photo-1592591502238-028381bb5017?auto=format&fit=crop&q=80&w=100" 
-                alt="MyHostel Logo" 
+                src="/logo.jpg" 
+                alt="myHostel Logo" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-2xl font-black tracking-tighter text-primary">MyHostel</span>
-              <span className="text-[10px] font-bold text-primary/60 ml-0.5">.com</span>
+              <span className="text-2xl font-black tracking-tighter text-primary">myHostel</span>
             </div>
           </div>
         </div>
@@ -1838,20 +1828,19 @@ const Navbar = ({
 const Footer = ({ onViewChange, isLoggedIn }: { onViewChange: (view: AppView) => void, isLoggedIn: boolean }) => (
   <footer className="bg-primary text-on-primary py-16 mt-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div className="space-y-4">
           <div className="flex items-center cursor-pointer" onClick={() => onViewChange('home')}>
-            <div className="w-10 h-10 bg-secondary-fixed rounded-lg flex items-center justify-center mr-3 shadow-lg overflow-hidden">
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-2xl mx-auto overflow-hidden">
               <img 
-                src="https://images.unsplash.com/photo-1592591502238-028381bb5017?auto=format&fit=crop&q=80&w=100" 
-                alt="MyHostel Logo" 
+                src="/logo.jpg" 
+                alt="myHostel Logo" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-2xl font-bold tracking-tighter text-on-primary">MyHostel</span>
-              <span className="text-[10px] font-bold text-on-primary/60 ml-0.5">.com</span>
+            <div className="flex flex-col items-center justify-center leading-none">
+              <span className="text-2xl font-bold tracking-tighter text-on-primary">myHostel</span>
             </div>
           </div>
           <p className="text-on-primary/80 text-sm leading-relaxed">
@@ -2058,6 +2047,22 @@ function MainApp() {
   const [hostels, setHostels] = useState<Hostel[]>(MOCK_HOSTELS);
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
+  const heroImages = [
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=2000',
+    'https://images.unsplash.com/photo-1555854817-5b2260d1bc63?auto=format&fit=crop&q=80&w=2000',
+    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=2000'
+  ];
+
+  useEffect(() => {
+    if (view === 'home') {
+      const interval = setInterval(() => {
+        setHeroImageIndex((prev) => (prev + 1) % heroImages.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [view]);
 
   // Auth Form State
   const [email, setEmail] = useState('');
@@ -2562,7 +2567,7 @@ function MainApp() {
         location: formData.get('location') as string,
         university: formData.get('university') as string,
         price: Number(formData.get('price')),
-        image: uploadedImage || (isEditingHostel ? editingHostel?.image : 'https://images.unsplash.com/photo-1555854817-5b2260d1bc63?auto=format&fit=crop&q=80&w=1000'),
+        image: uploadedImage || (isEditingHostel ? editingHostel?.image : '/logo.jpg'),
         amenities: selectedAmenities.length > 0 ? selectedAmenities : ['General Amenities'],
         description: formData.get('description') as string,
         payment_details: {
@@ -2687,7 +2692,7 @@ function MainApp() {
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
           onBack={handleBack}
-          canGoBack={viewHistory.length > 0}
+          canGoBack={false}
         />
       )}
 
@@ -2848,10 +2853,10 @@ function MainApp() {
             >
               <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-10 border border-outline-variant/30">
                 <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg overflow-hidden">
+                  <div className="w-20 h-20 bg-primary rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-xl overflow-hidden">
                     <img 
-                      src="https://images.unsplash.com/photo-1592591502238-028381bb5017?auto=format&fit=crop&q=80&w=200" 
-                      alt="MyHostel Logo" 
+                      src="/logo.jpg" 
+                      alt="myHostel Logo" 
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
@@ -3183,7 +3188,7 @@ function MainApp() {
                   </div>
                   
                   <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-2 gap-6">
                       <div>
                         <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-2">Billed To</p>
                         <p className="font-bold text-primary">{user.name}</p>
@@ -3307,32 +3312,35 @@ function MainApp() {
               className="relative"
             >
               {/* Hero Section */}
-              <section className="relative h-[85vh] flex items-center overflow-hidden">
-                <div className="absolute inset-0 z-0">
-                  <img 
-                    src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=2000" 
-                    className="w-full h-full object-cover brightness-[0.4]"
-                    alt="Students studying"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+              <section className="relative h-[65vh] md:h-[85vh] flex items-center overflow-hidden">
+                <AnimatePresence>
+                  <motion.div 
+                    key={heroImageIndex}
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '-100%' }}
+                    transition={{ type: 'tween', duration: 0.8, ease: 'circInOut' }}
+                    className="absolute inset-0 z-0"
+                  >
+                    <img 
+                      src={heroImages[heroImageIndex]} 
+                      className="w-full h-full object-cover brightness-[0.4]"
+                      alt="Students studying"
+                      referrerPolicy="no-referrer"
+                    />
+                  </motion.div>
+                </AnimatePresence>
                 
-                <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white">
+                <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white w-full border-box">
                   <motion.div
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 }}
                     className="max-w-2xl"
                   >
-                    <span className="inline-block bg-secondary-fixed text-on-secondary-fixed px-4 py-1 rounded-full text-sm font-bold mb-6 tracking-wide uppercase">
-                      Premium Student Living
-                    </span>
-                    <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-[1.1]">
+                    <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-8 leading-[1.1]">
                       Find Your Perfect <span className="text-secondary-fixed">Study Haven</span> in Malawi.
                     </h1>
-                    <p className="text-lg md:text-xl text-surface-container-highest/90 mb-10 leading-relaxed font-medium">
-                      Safe, verified, and curated hostels near all major universities. Your academic success starts with a comfortable home.
-                    </p>
                     
                     <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 max-w-xl">
                       <div className="relative flex-grow">
@@ -3354,18 +3362,6 @@ function MainApp() {
                     </form>
                   </motion.div>
                 </div>
-
-                {/* Floating Stats */}
-                <div className="absolute bottom-12 right-12 hidden lg:flex flex-col gap-4">
-                  <div className="glass-effect p-6 rounded-3xl editorial-shadow border border-white/20">
-                    <div className="text-3xl font-bold text-primary">500+</div>
-                    <div className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">Verified Hostels</div>
-                  </div>
-                  <div className="glass-effect p-6 rounded-3xl editorial-shadow border border-white/20">
-                    <div className="text-3xl font-bold text-primary">12k+</div>
-                    <div className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">Happy Students</div>
-                  </div>
-                </div>
               </section>
 
               {/* Featured Hostels Section */}
@@ -3373,7 +3369,7 @@ function MainApp() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
                     <div>
-                      <h2 className="text-3xl md:text-5xl font-black text-primary mb-4">Featured Hostels</h2>
+                      <h2 className="text-2xl md:text-5xl font-black text-primary mb-4">Featured Hostels</h2>
                       <p className="text-on-surface-variant max-w-xl font-medium">Hand-picked premium accommodations verified for safety and comfort.</p>
                     </div>
                     <button 
@@ -3384,7 +3380,7 @@ function MainApp() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {MOCK_HOSTELS.slice(0, 3).map((hostel) => (
                       <div 
                         key={`featured-${hostel.id}`}
@@ -3441,11 +3437,11 @@ function MainApp() {
               <section className="py-24 bg-surface-container-lowest">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">Why Choose myHostel?</h2>
+                    <h2 className="text-2xl md:text-5xl font-bold text-primary mb-4">Why Choose myHostel?</h2>
                     <p className="text-on-surface-variant max-w-2xl mx-auto">We take the stress out of finding accommodation so you can focus on your studies.</p>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[
                       { icon: ShieldCheck, title: 'Verified Listings', desc: 'Every hostel on our platform is physically inspected and verified by our team.' },
                       { icon: Clock, title: 'Real-time Availability', desc: 'No more calling around. See instantly which rooms are available for the semester.' },
@@ -3568,7 +3564,7 @@ function MainApp() {
                 }}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               >
                 {filteredHostels.map((hostel) => (
                   <motion.div 
@@ -3662,7 +3658,7 @@ function MainApp() {
 
                   <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-8 md:p-12 border border-outline-variant/30">
                     <form onSubmit={handleListHostel} className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Hostel Name</label>
                           <input name="name" type="text" required defaultValue={editingHostel?.name} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="e.g. Sunrise Villa" />
@@ -3724,7 +3720,7 @@ function MainApp() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                           <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Monthly Price (MK)</label>
                           <input name="price" type="number" required defaultValue={editingHostel?.price} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="45000" />
@@ -3744,7 +3740,7 @@ function MainApp() {
                       <div className="space-y-6">
                         <h3 className="text-xl font-bold text-primary">Payment Details (For Bookings)</h3>
                         <p className="text-sm text-on-surface-variant">Provide the details where students should send their booking payments.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-2">
                             <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Airtel Money Number</label>
                             <input name="airtelMoney" type="text" defaultValue={editingHostel?.paymentDetails?.airtelMoney} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="099..." />
@@ -3783,7 +3779,7 @@ function MainApp() {
             >
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
                 <div>
-                  <h2 className="text-5xl font-black text-primary mb-8 leading-tight">We're here to <span className="text-secondary-fixed">help</span> you settle in.</h2>
+                  <h2 className="text-4xl md:text-5xl font-black text-primary mb-8 leading-tight">We're here to <span className="text-secondary-fixed">help</span> you settle in.</h2>
                   <p className="text-on-surface-variant text-xl mb-12 leading-relaxed">Whether you're a student looking for a room or a landlord with questions, our team is ready to assist.</p>
                   
                   <div className="space-y-6">
@@ -3831,7 +3827,7 @@ function MainApp() {
                 Back to Listings
               </button>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                   <motion.div 
                     layoutId={`hostel-${selectedHostel.id}`}
@@ -4027,7 +4023,7 @@ function MainApp() {
 
               <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-8 md:p-12 border border-outline-variant/30">
                 <form onSubmit={handleUpdateProfile} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Full Name</label>
                       <input name="name" type="text" required defaultValue={user.name} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" />
