@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+
+@theme {
+  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #003b5a;
+  --color-primary-container: #1a5276;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #94c5ee;
+  
+  --color-secondary: #865300;
+  --color-secondary-container: #fea520;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #694000;
+  
+  --color-tertiary: #00401e;
+  --color-tertiary-container: #005a2c;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #58d683;
+
+  --color-surface: #f9f9fc;
+  --color-surface-dim: #d9dadd;
+  --color-surface-bright: #f9f9fc;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f3f7;
+  --color-surface-container: #edeef1;
+  --color-surface-container-high: #e7e8eb;
+  --color-surface-container-highest: #e2e2e6;
+  
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #41474e;
+  
+  --color-outline: #72787f;
+  --color-outline-variant: #c1c7cf;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  /* Fixed colors from spec */
+  --color-secondary-fixed: #ffddb9;
+  --color-on-secondary-fixed: #2b1700;
+  --color-secondary-fixed-dim: #ffb961;
+  --color-on-secondary-fixed-variant: #663e00;
+
+  --color-tertiary-fixed: #7efba4;
+  --color-on-tertiary-fixed: #00210c;
+  --color-tertiary-fixed-dim: #61de8a;
+  --color-on-tertiary-fixed-variant: #005228;
+
+  --color-primary-fixed: #cbe6ff;
+  --color-on-primary-fixed: #001e30;
+  --color-primary-fixed-dim: #9bccf6;
+  --color-on-primary-fixed-variant: #0e4b6e;
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  .dark {
+    --color-primary: #9bccf6;
+    --color-primary-container: #0e4b6e;
+    --color-on-primary: #001e30;
+    --color-on-primary-container: #cbe6ff;
+    
+    --color-secondary: #ffb961;
+    --color-secondary-container: #663e00;
+    --color-on-secondary: #2b1700;
+    --color-on-secondary-container: #ffddb9;
+    
+    --color-tertiary: #61de8a;
+    --color-tertiary-container: #005228;
+    --color-on-tertiary: #00210c;
+    --color-on-tertiary-container: #7efba4;
+
+    --color-surface: #111416;
+    --color-surface-dim: #111416;
+    --color-surface-bright: #373a3c;
+    --color-surface-container-lowest: #0c0f11;
+    --color-surface-container-low: #191c1e;
+    --color-surface-container: #1d2022;
+    --color-surface-container-high: #282a2d;
+    --color-surface-container-highest: #333538;
+    
+    --color-on-surface: #e2e2e6;
+    --color-on-surface-variant: #c1c7cf;
+    
+    --color-outline: #8b9199;
+    --color-outline-variant: #41474e;
+  }
+
+  body {
+    @apply bg-surface text-on-surface font-body selection:bg-secondary-fixed transition-colors duration-300;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    @apply backdrop-blur-3xl bg-white/80 dark:bg-black/40;
+  }
+  
+  .editorial-shadow {
+    box-shadow: 0 32px 64px -12px rgba(0, 59, 90, 0.15);
+  }
+
+  .dark .editorial-shadow {
+    box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+
+  .interactive-scale {
+    @apply transition-transform duration-200 active:scale-95;
+  }
+}
+
