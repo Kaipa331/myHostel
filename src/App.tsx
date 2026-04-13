@@ -60,6 +60,9 @@ import { Sidebar as LayoutSidebar } from './components/layout/Sidebar';
 import LayoutFooter from './components/layout/Footer';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
+import { HomeView } from './components/views/HomeView';
+import { ListingsView } from './components/views/ListingsView';
+
 const LandlordDashboardView = lazy(() => import('./components/dashboard/LandlordDashboard').then((module) => ({ default: module.LandlordDashboard })));
 const AdminDashboardView = lazy(() => import('./components/dashboard/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 const StudentDashboardView = lazy(() => import('./components/dashboard/StudentDashboard').then((module) => ({ default: module.StudentDashboard })));
@@ -70,8 +73,6 @@ const PaymentModalView = lazy(() => import('./components/modal/PaymentModal').th
 const InvoiceModalView = lazy(() => import('./components/modal/InvoiceModal').then((module) => ({ default: module.InvoiceModal })));
 const AuthView = lazy(() => import('./components/views/AuthView').then((module) => ({ default: module.AuthView })));
 const BookingConfirmationView = lazy(() => import('./components/views/BookingConfirmationView').then((module) => ({ default: module.BookingConfirmationView })));
-const HomeView = lazy(() => import('./components/views/HomeView').then((module) => ({ default: module.HomeView })));
-const ListingsView = lazy(() => import('./components/views/ListingsView').then((module) => ({ default: module.ListingsView })));
 const SupportView = lazy(() => import('./components/views/SupportView').then((module) => ({ default: module.SupportView })));
 
 const ScreenFallback = () => (
@@ -2156,190 +2157,69 @@ function MainApp() {
     };
   }, []);
 
-  // Real-time Bookings
+  // 2. User Data (Fetch when logged in)
   useEffect(() => {
     if (!isLoggedIn || !user) {
       setBookings([]);
-      return;
-    }
-
-    const fetchBookings = async () => {
-      const column = user.role === 'student' ? 'student_id' : 'landlord_id';
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq(column, user.uid);
-      
-      if (error) handleSupabaseError(error, OperationType.LIST, 'bookings');
-      else if (data) setBookings(data.map(mapBooking));
-    };
-
-    fetchBookings();
-
-    const channel = supabase
-      .channel('public:bookings')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'bookings',
-        filter: `${user.role === 'student' ? 'student_id' : 'landlord_id'}=eq.${user.uid}`
-      }, () => {
-        fetchBookings();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isLoggedIn, user]);
-
-  // Real-time Enquiries
-  useEffect(() => {
-    if (!isLoggedIn || !user) {
       setEnquiries([]);
-      return;
-    }
-
-    const fetchEnquiries = async () => {
-      const column = user.role === 'student' ? 'student_id' : 'landlord_id';
-      const { data, error } = await supabase
-        .from('enquiries')
-        .select('*')
-        .eq(column, user.uid);
-      
-      if (error) handleSupabaseError(error, OperationType.LIST, 'enquiries');
-      else if (data) setEnquiries(data.map(mapEnquiry));
-    };
-
-    fetchEnquiries();
-
-    const channel = supabase
-      .channel('public:enquiries')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'enquiries',
-        filter: `${user.role === 'student' ? 'student_id' : 'landlord_id'}=eq.${user.uid}`
-      }, () => {
-        fetchEnquiries();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isLoggedIn, user]);
-
-  // Real-time Pending Landlords (Admin only)
-  useEffect(() => {
-    if (!isLoggedIn || !user || user.role !== 'admin') {
+      setReviews([]);
+      setSavedHostels([]);
       setPendingLandlords([]);
       return;
     }
 
-    const fetchPendingLandlords = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'landlord')
-        .eq('admin_approved', false);
+    const fetchUserData = async () => {
+      try {
+        const column = user.role === 'student' ? 'student_id' : 'landlord_id';
+        const promises: Promise<any>[] = [
+          supabase.from('bookings').select('*').eq(column, user.uid),
+          supabase.from('enquiries').select('*').eq(column, user.uid)
+        ];
 
-      if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
-      else if (data) setPendingLandlords(data.map(mapProfile));
-    };
+        if (user.role === 'student') {
+          promises.push(supabase.from('saved_hostels').select('hostel_id, hostels(*)').eq('student_id', user.uid));
+          promises.push(supabase.from('reviews').select('*').eq('student_id', user.uid));
+        } else if (user.role === 'admin') {
+          promises.push(supabase.from('profiles').select('*').eq('role', 'landlord').eq('admin_approved', false));
+          promises.push(supabase.from('reviews').select('*'));
+        }
 
-    fetchPendingLandlords();
-
-    const channel = supabase
-      .channel('public:profiles')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'profiles'
-      }, () => {
-        fetchPendingLandlords();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isLoggedIn, user]);
-
-  // Real-time Saved Hostels (Students only)
-  useEffect(() => {
-    if (!isLoggedIn || !user || user.role !== 'student') {
-      setSavedHostels([]);
-      return;
-    }
-
-    const fetchSavedHostels = async () => {
-      const { data, error } = await supabase
-        .from('saved_hostels')
-        .select(`
-          hostel_id,
-          hostels (*)
-        `)
-        .eq('student_id', user.uid);
-
-      if (error) handleSupabaseError(error, OperationType.LIST, 'saved_hostels');
-      else if (data) {
-        const saved = data.map(item => mapHostel(item.hostels as any));
-        setSavedHostels(saved);
+        const results = await Promise.all(promises);
+        
+        if (results[0].data) setBookings(results[0].data.map(mapBooking));
+        if (results[1].data) setEnquiries(results[1].data.map(mapEnquiry));
+        
+        if (user.role === 'student') {
+          if (results[2]?.data) {
+            const saved = (results[2].data as any[]).map(item => mapHostel(item.hostels));
+            setSavedHostels(saved);
+          }
+          if (results[3]?.data) setReviews(results[3].data.map(mapReview));
+        } else if (user.role === 'admin') {
+          if (results[2]?.data) setPendingLandlords(results[2].data.map(mapProfile));
+          if (results[3]?.data) setReviews(results[3].data.map(mapReview));
+        }
+      } catch (error) {
+        console.error("Authenticated data sync failed:", error);
       }
     };
 
-    fetchSavedHostels();
+    fetchUserData();
 
-    const channel = supabase
-      .channel('public:saved_hostels')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'saved_hostels',
-        filter: `student_id=eq.${user.uid}`
-      }, () => {
-        fetchSavedHostels();
-      })
-      .subscribe();
+    const channels = [
+      supabase.channel('bookings_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchUserData).subscribe(),
+      supabase.channel('enquiries_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, fetchUserData).subscribe(),
+      supabase.channel('reviews_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, fetchUserData).subscribe()
+    ];
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isLoggedIn, user]);
-
-  // Real-time Reviews
-  useEffect(() => {
-    if (!isLoggedIn || !user) {
-      setReviews([]);
-      return;
+    if (user.role === 'admin') {
+      channels.push(supabase.channel('profiles_sync').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, fetchUserData).subscribe());
     }
 
-    const fetchReviews = async () => {
-      let query = supabase.from('reviews').select('*');
-      
-      if (user.role === 'student') {
-        query = query.eq('student_id', user.uid);
-      }
-      
-      const { data, error } = await query;
-      if (error) handleSupabaseError(error, OperationType.LIST, 'reviews');
-      else if (data) setReviews(data.map(mapReview));
-    };
-
-    fetchReviews();
-
-    const channel = supabase
-      .channel('public:reviews')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
-        fetchReviews();
-      })
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user?.uid, user?.role]);
 
   const navigateTo = (newView: AppView) => {
     if (newView !== view) {
@@ -2731,7 +2611,7 @@ function MainApp() {
     }
   };
 
-  if (!isAuthReady) return (
+  const renderAuthLoading = () => (
     <div className="min-h-screen flex items-center justify-center bg-surface">
       <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
     </div>
@@ -2801,84 +2681,86 @@ function MainApp() {
             />
           )}
 
-          {view === 'dashboard' && user && (
-            <div className="flex flex-col lg:flex-row min-h-screen bg-surface-container-lowest overflow-x-hidden">
-              <LayoutSidebar
-                user={user}
-                activeView={activeDashboardView}
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                onViewChange={(v) => {
-                  if (['dashboard', 'bookings', 'messages', 'saved', 'settings', 'approvals', 'moderation', 'properties', 'transactions', 'complaints'].includes(v)) {
-                    setActiveDashboardView(v);
-                  } else {
-                    navigateTo(v as AppView);
-                  }
-                }}
-                onLogout={handleLogout}
-              />
-              {user.role === 'admin' ? (
-                <AdminDashboardView
+          {view === 'dashboard' && (
+            !isAuthReady ? renderAuthLoading() : user ? (
+              <div className="flex flex-col lg:flex-row min-h-screen bg-surface-container-lowest overflow-x-hidden">
+                <LayoutSidebar
                   user={user}
                   activeView={activeDashboardView}
+                  isOpen={isSidebarOpen}
+                  onClose={() => setIsSidebarOpen(false)}
                   onViewChange={(v) => {
-                    if (['dashboard', 'approvals', 'moderation', 'settings', 'complaints'].includes(v)) {
+                    if (['dashboard', 'bookings', 'messages', 'saved', 'settings', 'approvals', 'moderation', 'properties', 'transactions', 'complaints'].includes(v)) {
                       setActiveDashboardView(v);
                     } else {
                       navigateTo(v as AppView);
                     }
                   }}
-                  reviews={reviews}
-                  hostels={hostels}
-                  pendingLandlords={pendingLandlords}
-                  onViewHostel={(h) => {
-                    setSelectedHostel(h);
-                    setView('detail');
-                  }}
+                  onLogout={handleLogout}
                 />
-              ) : user.role === 'landlord' ? (
-                <LandlordDashboardView
-                  user={user}
-                  hostels={hostels}
-                  bookings={bookings}
-                  activeView={activeDashboardView}
-                  enquiries={enquiries}
-                  onViewChange={navigateTo}
-                  onEdit={(h) => {
-                    setEditingHostel(h);
-                    setIsEditingHostel(true);
-                    navigateTo('list-hostel');
-                  }}
-                  onDelete={handleDeleteHostel}
-                  onAcceptBooking={handleAcceptBooking}
-                  onDeclineBooking={handleDeclineBooking}
-                  onOpenHostelDetail={(h) => {
-                    setSelectedHostel(h);
-                    setView('detail');
-                  }}
-                  onReplyEnquiry={handleReplyEnquiry}
-                />
-              ) : (
-                <StudentDashboardView
-                  user={user}
-                  bookings={bookings}
-                  enquiries={enquiries}
-                  hostels={hostels}
-                  savedHostels={savedHostels}
-                  activeView={activeDashboardView}
-                  onViewChange={navigateTo}
-                  onOpenPayment={() => setShowPaymentModal(true)}
-                  onOpenInvoice={() => setShowInvoiceModal(true)}
-                  onSelectEnquiry={(e) => setSelectedEnquiry(e)}
-                  onOpenHostelDetail={(h) => {
-                    setSelectedHostel(h);
-                    setView('detail');
-                  }}
-                  onSaveHostel={handleSaveHostel}
-                  onUnsaveHostel={handleUnsaveHostel}
-                />
-              )}
-            </div>
+                {user.role === 'admin' ? (
+                  <AdminDashboardView
+                    user={user}
+                    activeView={activeDashboardView}
+                    onViewChange={(v) => {
+                      if (['dashboard', 'approvals', 'moderation', 'settings', 'complaints'].includes(v)) {
+                        setActiveDashboardView(v);
+                      } else {
+                        navigateTo(v as AppView);
+                      }
+                    }}
+                    reviews={reviews}
+                    hostels={hostels}
+                    pendingLandlords={pendingLandlords}
+                    onViewHostel={(h) => {
+                      setSelectedHostel(h);
+                      setView('detail');
+                    }}
+                  />
+                ) : user.role === 'landlord' ? (
+                  <LandlordDashboardView
+                    user={user}
+                    hostels={hostels}
+                    bookings={bookings}
+                    activeView={activeDashboardView}
+                    enquiries={enquiries}
+                    onViewChange={navigateTo}
+                    onEdit={(h) => {
+                      setEditingHostel(h);
+                      setIsEditingHostel(true);
+                      navigateTo('list-hostel');
+                    }}
+                    onDelete={handleDeleteHostel}
+                    onAcceptBooking={handleAcceptBooking}
+                    onDeclineBooking={handleDeclineBooking}
+                    onOpenHostelDetail={(h) => {
+                      setSelectedHostel(h);
+                      setView('detail');
+                    }}
+                    onReplyEnquiry={handleReplyEnquiry}
+                  />
+                ) : (
+                  <StudentDashboardView
+                    user={user}
+                    bookings={bookings}
+                    enquiries={enquiries}
+                    hostels={hostels}
+                    savedHostels={savedHostels}
+                    activeView={activeDashboardView}
+                    onViewChange={navigateTo}
+                    onOpenPayment={() => setShowPaymentModal(true)}
+                    onOpenInvoice={() => setShowInvoiceModal(true)}
+                    onSelectEnquiry={(e) => setSelectedEnquiry(e)}
+                    onOpenHostelDetail={(h) => {
+                      setSelectedHostel(h);
+                      setView('detail');
+                    }}
+                    onSaveHostel={handleSaveHostel}
+                    onUnsaveHostel={handleUnsaveHostel}
+                  />
+                )}
+              </div>
+            ) : null // Should be handled by navigateTo('login') in auth useEffect if not logged in
           )}
 
           {/* Modals */}

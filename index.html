@@ -6,7 +6,44 @@
     <title>myHostel</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        .initial-loader-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100dvh;
+          width: 100%;
+          background-color: #fdfbff;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .loader-spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #6750a4;
+          border-bottom-color: transparent;
+          border-radius: 50%;
+          display: inline-block;
+          animation: rotation 0.8s linear infinite;
+        }
+        .loader-text {
+          margin-top: 24px;
+          font-weight: 800;
+          color: #6750a4;
+          letter-spacing: -0.025em;
+          font-size: 1.25rem;
+        }
+        @keyframes rotation {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+      <div class="initial-loader-container">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">myHostel</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
