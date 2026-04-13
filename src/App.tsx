@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useMemo, useEffect, ErrorInfo, ReactNode, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -47,7 +47,7 @@ import {
   Heart,
   FileCheck,
   AlertTriangle,
-  ClipboardList,
+  ClipboardList, 
   Plus
 } from 'lucide-react';
 import { 
@@ -55,7 +55,32 @@ import {
   handleSupabaseError, 
   OperationType 
 } from './supabase';
+import { Navbar as LayoutNavbar } from './components/layout/Navbar';
+import { Sidebar as LayoutSidebar } from './components/layout/Sidebar';
+import LayoutFooter from './components/layout/Footer';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+
+const LandlordDashboardView = lazy(() => import('./components/dashboard/LandlordDashboard').then((module) => ({ default: module.LandlordDashboard })));
+const AdminDashboardView = lazy(() => import('./components/dashboard/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
+const StudentDashboardView = lazy(() => import('./components/dashboard/StudentDashboard').then((module) => ({ default: module.StudentDashboard })));
+const HostelDetailView = lazy(() => import('./components/hostel/HostelDetail').then((module) => ({ default: module.HostelDetail })));
+const HostelFormView = lazy(() => import('./components/hostel/HostelForm').then((module) => ({ default: module.HostelForm })));
+const ProfileFormView = lazy(() => import('./components/profile/ProfileForm').then((module) => ({ default: module.ProfileForm })));
+const PaymentModalView = lazy(() => import('./components/modal/PaymentModal').then((module) => ({ default: module.PaymentModal })));
+const InvoiceModalView = lazy(() => import('./components/modal/InvoiceModal').then((module) => ({ default: module.InvoiceModal })));
+const AuthView = lazy(() => import('./components/views/AuthView').then((module) => ({ default: module.AuthView })));
+const BookingConfirmationView = lazy(() => import('./components/views/BookingConfirmationView').then((module) => ({ default: module.BookingConfirmationView })));
+const HomeView = lazy(() => import('./components/views/HomeView').then((module) => ({ default: module.HomeView })));
+const ListingsView = lazy(() => import('./components/views/ListingsView').then((module) => ({ default: module.ListingsView })));
+const SupportView = lazy(() => import('./components/views/SupportView').then((module) => ({ default: module.SupportView })));
+
+const ScreenFallback = () => (
+  <div className="flex min-h-[60vh] items-center justify-center p-8">
+    <div className="rounded-3xl border border-outline-variant/30 bg-white dark:bg-surface-container px-6 py-4 text-sm font-bold text-primary shadow-xl">
+      Loading screen...
+    </div>
+  </div>
+);
 
 // --- Constants ---
 const AMENITY_OPTIONS = [
@@ -118,6 +143,8 @@ interface Hostel {
   landlordName?: string;
   paymentDetails?: PaymentDetails;
   bookingFee?: number;
+  totalRooms: number;
+  availableRooms: number;
   createdAt?: any;
 }
 
@@ -149,6 +176,7 @@ interface Enquiry {
   message: string;
   date: string;
   status: 'new' | 'replied';
+  replyMessage?: string;
 }
 
 interface Review {
@@ -175,10 +203,36 @@ interface UserProfile {
   bio?: string;
   university?: string;
   address?: string;
+  verified?: boolean;
+  adminApproved?: boolean;
+  documents?: string[];
   createdAt?: any;
 }
 
-type AppView = 'home' | 'listings' | 'detail' | 'list-hostel' | 'support' | 'login' | 'signup' | 'dashboard' | 'payment' | 'profile' | 'complaints' | 'bookings' | 'messages' | 'saved' | 'settings' | 'hostels' | 'enquiries' | 'analytics';
+type AppView =
+  | 'home'
+  | 'listings'
+  | 'detail'
+  | 'list-hostel'
+  | 'support'
+  | 'login'
+  | 'signup'
+  | 'dashboard'
+  | 'payment'
+  | 'profile'
+  | 'complaints'
+  | 'bookings'
+  | 'messages'
+  | 'saved'
+  | 'settings'
+  | 'hostels'
+  | 'enquiries'
+  | 'analytics'
+  | 'booking-confirmation'
+  | 'approvals'
+  | 'moderation'
+  | 'properties'
+  | 'transactions';
 
 // --- Mock Data ---
 const MOCK_HOSTELS: Hostel[] = [
@@ -196,6 +250,8 @@ const MOCK_HOSTELS: Hostel[] = [
     verified: true,
     landlordId: 'mock-1',
     bookingFee: 0,
+    totalRooms: 20,
+    availableRooms: 15,
     paymentDetails: {
       airtelMoney: '0999123456',
       tnmMpamba: '0888123456',
@@ -217,6 +273,8 @@ const MOCK_HOSTELS: Hostel[] = [
     verified: true,
     landlordId: 'mock-2',
     bookingFee: 3000,
+    totalRooms: 25,
+    availableRooms: 10,
     paymentDetails: {
       airtelMoney: '0999654321',
       tnmMpamba: '0888654321'
@@ -234,7 +292,9 @@ const MOCK_HOSTELS: Hostel[] = [
     amenities: ['AC', 'Private Kitchen', 'Shuttle Service', 'Backup Power'],
     description: 'The pinnacle of student luxury. Elite Campus Suites provides private living spaces with top-tier security and a dedicated shuttle service to campus.',
     verified: true,
-    landlordId: 'mock-3'
+    landlordId: 'mock-3',
+    totalRooms: 15,
+    availableRooms: 8
   },
   {
     id: '4',
@@ -248,7 +308,9 @@ const MOCK_HOSTELS: Hostel[] = [
     amenities: ['WiFi', 'Shared Kitchen', 'Water Backup', 'Study Hall'],
     description: 'A community-focused hostel that prioritizes safety and affordability. Great for first-year students looking to make friends.',
     verified: false,
-    landlordId: 'mock-4'
+    landlordId: 'mock-4',
+    totalRooms: 30,
+    availableRooms: 22
   }
 ];
 
@@ -378,7 +440,7 @@ const Sidebar = ({ user, activeView, onViewChange, onLogout, isOpen, onClose }: 
   );
 };
 
-const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onViewHostel }: { user: UserProfile, activeView: string, onViewChange: (view: AppView) => void, reviews: Review[], hostels: Hostel[], onViewHostel: (h: Hostel) => void }) => {
+const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, pendingLandlords, onViewHostel }: { user: UserProfile, activeView: string, onViewChange: (view: AppView) => void, reviews: Review[], hostels: Hostel[], pendingLandlords: UserProfile[], onViewHostel: (h: Hostel) => void }) => {
   const [selectedComplaint, setSelectedComplaint] = useState<Review | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [replyMessage, setReplyMessage] = useState('');
@@ -446,6 +508,36 @@ const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onVi
       console.error("Error sending message:", error);
     }
   };
+
+  const handleApproveLandlord = async (landlordId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ admin_approved: true, verified: true })
+        .eq('id', landlordId);
+
+      if (error) throw error;
+      alert("Landlord approved successfully!");
+    } catch (error) {
+      handleSupabaseError(error, OperationType.UPDATE, 'profiles');
+    }
+  };
+
+  const handleRejectLandlord = async (landlordId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ admin_approved: false, verified: false })
+        .eq('id', landlordId);
+
+      if (error) throw error;
+      alert("Landlord rejected. They can reapply with proper documentation.");
+    } catch (error) {
+      handleSupabaseError(error, OperationType.UPDATE, 'profiles');
+    }
+  };
+
+
 
   const renderContent = () => {
     switch (activeView) {
@@ -613,39 +705,53 @@ const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onVi
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/20">
-                  {MOCK_APPROVAL_QUEUE.map((item) => (
-                    <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
+                  {pendingLandlords.map((landlord) => (
+                    <tr key={landlord.uid} className="hover:bg-surface-container-lowest transition-colors">
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                            {item.name.split(' ').map(n => n[0]).join('')}
+                            {landlord.name.split(' ').map(n => n[0]).join('')}
                           </div>
                           <div>
-                            <div className="font-bold text-primary">{item.name}</div>
-                            <div className="text-xs text-on-surface-variant">{item.email}</div>
+                            <div className="font-bold text-primary">{landlord.name}</div>
+                            <div className="text-xs text-on-surface-variant">{landlord.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
                         <span className="px-3 py-1 bg-primary/5 text-primary rounded-full text-[10px] font-bold border border-primary/10">
-                          {item.university}
+                          {landlord.university || 'Not specified'}
                         </span>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex flex-col gap-1">
-                          {item.documents.map((doc, i) => (
-                            <div key={`doc-${item.id}-${i}`} className="flex items-center gap-1 text-[10px] font-bold text-on-surface-variant hover:text-primary cursor-pointer">
+                          {landlord.documents && landlord.documents.length > 0 ? landlord.documents.map((doc: string, i: number) => (
+                            <div key={`doc-${landlord.uid}-${i}`} className="flex items-center gap-1 text-[10px] font-bold text-on-surface-variant hover:text-primary cursor-pointer">
                               <FileText className="w-3 h-3" />
                               {doc}
                             </div>
-                          ))}
+                          )) : (
+                            <span className="text-[10px] text-on-surface-variant">No documents uploaded</span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-xs font-bold text-on-surface-variant">{item.date}</td>
+                      <td className="px-8 py-6 text-xs font-bold text-on-surface-variant">
+                        {new Date().toLocaleDateString()} {/* TODO: Add created_at to profiles */}
+                      </td>
                       <td className="px-8 py-6">
                         <div className="flex gap-2">
-                          <button className="px-3 py-1.5 bg-tertiary text-on-tertiary rounded-lg text-[10px] font-black hover:scale-105 transition-transform">Approve</button>
-                          <button className="px-3 py-1.5 bg-error/10 text-error rounded-lg text-[10px] font-black hover:bg-error/20 transition-colors">Reject</button>
+                          <button 
+                            onClick={() => handleApproveLandlord(landlord.uid)}
+                            className="px-3 py-1.5 bg-tertiary text-on-tertiary rounded-lg text-[10px] font-black hover:scale-105 transition-transform"
+                          >
+                            Approve
+                          </button>
+                          <button 
+                            onClick={() => handleRejectLandlord(landlord.uid)}
+                            className="px-3 py-1.5 bg-error/10 text-error rounded-lg text-[10px] font-black hover:bg-error/20 transition-colors"
+                          >
+                            Reject
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -849,315 +955,6 @@ const AdminDashboard = ({ user, activeView, onViewChange, reviews, hostels, onVi
   );
 };
 
-const LandlordDashboard = ({ user, hostels, activeView, onViewChange, onEdit, onDelete }: { user: UserProfile, hostels: Hostel[], activeView: string, onViewChange: (view: AppView) => void, onEdit: (h: Hostel) => void, onDelete: (id: string) => void }) => {
-  const myHostels = hostels.filter(h => h.landlordId === user.uid);
-  
-  const renderContent = () => {
-    switch (activeView) {
-      case 'properties':
-        return (
-          <section>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-primary">My Properties</h2>
-              <button onClick={() => onViewChange('list-hostel')} className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold hover:scale-105 transition-transform">Add Property</button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {myHostels.map(hostel => (
-                <div key={hostel.id} className="bg-white dark:bg-surface-container rounded-[2.5rem] overflow-hidden border border-outline-variant/30 hover:border-primary transition-all group editorial-shadow">
-                  <div className="h-48 relative overflow-hidden">
-                    <img src={hostel.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      <button onClick={() => onEdit(hostel)} className="p-2 bg-white/90 backdrop-blur rounded-lg text-primary hover:bg-primary hover:text-on-primary transition-all shadow-sm"><Settings className="w-4 h-4" /></button>
-                      <button onClick={() => onDelete(hostel.id)} className="p-2 bg-white/90 backdrop-blur rounded-lg text-error hover:bg-error hover:text-on-error transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                  <div className="p-8">
-                    <h3 className="text-xl font-black text-primary mb-1">{hostel.name}</h3>
-                    <p className="text-sm text-on-surface-variant font-medium mb-6">{hostel.location}</p>
-                    <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/20 pt-6">
-                      <div>
-                        <div className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Rooms</div>
-                        <div className="text-2xl font-black text-primary">24</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Occupancy</div>
-                        <div className="text-2xl font-black text-secondary-fixed">88%</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {myHostels.length === 0 && (
-                <div className="col-span-full py-20 text-center bg-white dark:bg-surface-container rounded-[2.5rem] border-2 border-dashed border-outline-variant/30">
-                  <Building className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
-                  <p className="text-on-surface-variant font-bold">No properties listed yet.</p>
-                  <button onClick={() => onViewChange('list-hostel')} className="mt-4 text-primary font-black hover:underline">List your first hostel</button>
-                </div>
-              )}
-            </div>
-          </section>
-        );
-      case 'bookings':
-        return (
-          <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow overflow-hidden">
-            <div className="p-8 border-b border-outline-variant/30">
-              <h2 className="text-2xl font-black text-primary">Booking Requests</h2>
-              <p className="text-sm text-on-surface-variant font-medium">Manage incoming reservations for your properties.</p>
-            </div>
-            <div className="p-8">
-              <div className="space-y-6">
-                {[
-                  { name: 'Chifundo Phiri', room: 'Single Room - Skyline', time: '2 mins ago', status: 'pending', amount: 'MK 45,000' },
-                  { name: 'Grace Banda', room: 'Shared Wing - MUBAS', time: '45 mins ago', status: 'pending', amount: 'MK 32,000' },
-                  { name: 'Limbani Mwale', room: 'Single Room - Skyline', time: '3 hours ago', status: 'confirmed', amount: 'MK 45,000' },
-                ].map((booking, i) => (
-                  <div key={i} className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 rounded-3xl bg-surface-container-low border border-outline-variant/20 gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                        {booking.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-primary">{booking.name}</h4>
-                        <p className="text-xs text-on-surface-variant">{booking.room} • {booking.time}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-8">
-                      <div className="text-right">
-                        <div className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-1">Deposit</div>
-                        <div className="text-sm font-bold text-primary">{booking.amount}</div>
-                      </div>
-                      {booking.status === 'pending' ? (
-                        <div className="flex gap-2">
-                          <button className="px-4 py-2 bg-primary text-on-primary rounded-xl text-[10px] font-black hover:scale-105 transition-transform">Accept</button>
-                          <button className="px-4 py-2 bg-surface-container text-on-surface-variant rounded-xl text-[10px] font-black hover:bg-error/10 hover:text-error transition-all">Decline</button>
-                        </div>
-                      ) : (
-                        <span className="px-4 py-2 bg-tertiary/10 text-tertiary rounded-xl text-[10px] font-black uppercase tracking-widest">Confirmed</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        );
-      case 'messages':
-        return (
-          <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow overflow-hidden">
-            <div className="p-8 border-b border-outline-variant/30">
-              <h2 className="text-2xl font-black text-primary">Student Enquiries</h2>
-              <p className="text-sm text-on-surface-variant font-medium">Respond to questions from potential residents.</p>
-            </div>
-            <div className="divide-y divide-outline-variant/20">
-              {[
-                { name: 'Tiwonge Kumwenda', subject: 'Water availability at Skyline', date: 'Today, 09:15', message: 'Hi, I wanted to ask if there is a backup water tank at the hostel? I noticed the area has frequent water cuts.' },
-                { name: 'Isaac Msiska', subject: 'Room sharing policy', date: 'Yesterday', message: 'Can I share a room with a friend who is at a different university?' },
-              ].map((msg, i) => (
-                <div key={i} className="p-8 hover:bg-surface-container-lowest transition-colors cursor-pointer group">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-primary group-hover:text-secondary-fixed transition-colors">{msg.name}</h4>
-                    <span className="text-[10px] font-medium text-on-surface-variant">{msg.date}</span>
-                  </div>
-                  <h5 className="text-sm font-bold text-primary/80 mb-2">{msg.subject}</h5>
-                  <p className="text-xs text-on-surface-variant line-clamp-2 leading-relaxed">{msg.message}</p>
-                  <div className="mt-4 flex gap-2">
-                    <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Reply Now</button>
-                    <button className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest hover:underline">Mark as Read</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      case 'settings':
-        return (
-          <section className="bg-white dark:bg-surface-container rounded-[2.5rem] border border-outline-variant/30 editorial-shadow p-8">
-            <h2 className="text-2xl font-black text-primary mb-8">Landlord Settings</h2>
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Payment Methods</h3>
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-secondary-fixed/10 flex items-center justify-center text-secondary-fixed font-bold">A</div>
-                        <div>
-                          <div className="text-sm font-bold text-primary">Airtel Money</div>
-                          <div className="text-[10px] text-on-surface-variant">0888 123 456</div>
-                        </div>
-                      </div>
-                      <button className="text-[10px] font-black text-primary hover:underline">Edit</button>
-                    </div>
-                    <button className="w-full py-3 rounded-xl border-2 border-dashed border-outline-variant/50 text-[10px] font-black text-on-surface-variant hover:border-primary hover:text-primary transition-all">+ Add New Method</button>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h3 className="text-sm font-black text-on-surface-variant uppercase tracking-widest">Notification Preferences</h3>
-                  <div className="space-y-3">
-                    {['Email Notifications', 'SMS Alerts', 'New Booking Sounds'].map((pref, i) => (
-                      <div key={i} className="flex justify-between items-center p-4 rounded-2xl bg-surface-container-low">
-                        <span className="text-sm font-bold text-primary">{pref}</span>
-                        <div className="w-10 h-5 bg-primary rounded-full relative"><div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div></div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        );
-      case 'dashboard':
-      default:
-        return (
-          <>
-            <div className="bg-tertiary/20 border-l-8 border-tertiary p-8 rounded-3xl mb-12 flex justify-between items-center relative overflow-hidden">
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-tertiary rounded-full flex items-center justify-center text-on-tertiary shadow-lg">
-                    <Check className="w-5 h-5" />
-                  </div>
-                  <h2 className="text-2xl font-black text-primary">Approved by Admin</h2>
-                </div>
-                <p className="text-on-surface-variant font-medium">Your profile and properties are verified for the 2024/25 academic year.</p>
-              </div>
-              <div className="px-4 py-1.5 bg-primary text-on-primary rounded-full text-[10px] font-black tracking-[0.2em] relative z-10">
-                CERTIFIED PARTNER
-              </div>
-              <CheckCircle2 className="absolute -bottom-8 -right-8 w-48 h-48 text-tertiary/10 -rotate-12" />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-8">
-                <section>
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-black text-primary">My Properties</h2>
-                    <button onClick={() => onViewChange('list-hostel')} className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
-                      Add New <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {myHostels.slice(0, 2).map(hostel => (
-                      <div key={hostel.id} className="bg-white dark:bg-surface-container rounded-[2.5rem] overflow-hidden border border-outline-variant/30 hover:border-primary transition-all group editorial-shadow">
-                        <div className="h-48 relative overflow-hidden">
-                          <img src={hostel.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                          <div className="absolute top-4 right-4">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${hostel.verified ? 'bg-tertiary text-on-tertiary' : 'bg-secondary-fixed text-on-secondary-fixed'}`}>
-                              {hostel.verified ? 'ACTIVE' : 'MAINTENANCE'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-8">
-                          <h3 className="text-xl font-black text-primary mb-1">{hostel.name}</h3>
-                          <p className="text-sm text-on-surface-variant font-medium mb-6">{hostel.location}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-primary text-on-primary p-8 rounded-[2.5rem] shadow-xl shadow-primary/20 relative overflow-hidden group">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">Monthly Revenue</div>
-                      <div className="text-2xl font-black">MK 2,450,000</div>
-                    </div>
-                    <CreditCard className="absolute -bottom-4 -right-4 w-24 h-24 text-white/10 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="bg-white dark:bg-surface-container p-8 rounded-[2.5rem] border border-outline-variant/30 editorial-shadow relative overflow-hidden group">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-2 text-on-surface-variant">Pending Invoices</div>
-                      <div className="text-2xl font-black text-primary">14</div>
-                    </div>
-                    <FileText className="absolute -bottom-4 -right-4 w-24 h-24 text-primary/5 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <div className="bg-white dark:bg-surface-container p-8 rounded-[2.5rem] border border-outline-variant/30 editorial-shadow relative overflow-hidden group">
-                    <div className="relative z-10">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-2 text-on-surface-variant">Average Rating</div>
-                      <div className="text-2xl font-black text-primary">4.8 / 5.0</div>
-                      <div className="flex gap-0.5 mt-1">
-                        {[1,2,3,4,5].map(i => <Star key={`rating-star-${i}`} className="w-3 h-3 fill-secondary-fixed text-secondary-fixed" />)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <aside className="space-y-8">
-                <section className="bg-surface-container p-8 rounded-[2.5rem] border border-outline-variant/30">
-                  <h2 className="text-xl font-black text-primary mb-8 flex items-center gap-2">
-                    <Bell className="w-5 h-5" />
-                    New Bookings
-                  </h2>
-                  <div className="space-y-6">
-                    {[
-                      { name: 'Chifundo Phiri', room: 'Single Room - Skyline', time: '2 mins ago', status: 'pending' },
-                      { name: 'Grace Banda', room: 'Shared Wing - MUBAS', time: '45 mins ago', status: 'pending' },
-                    ].map((booking, i) => (
-                      <div key={`new-booking-${i}`} className="bg-white dark:bg-surface-container p-6 rounded-3xl border-l-4 border-primary shadow-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-primary">{booking.name}</h4>
-                          <span className="text-[10px] font-medium text-on-surface-variant">{booking.time}</span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant mb-4 font-medium">Booked {booking.room}</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button className="py-2 bg-primary text-on-primary rounded-xl text-[10px] font-black hover:scale-105 transition-transform">Accept</button>
-                          <button className="py-2 bg-surface-container text-on-surface-variant rounded-xl text-[10px] font-black hover:bg-error/10 hover:text-error transition-all">Decline</button>
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={() => onViewChange('dashboard')} className="w-full py-4 rounded-2xl border-2 border-dashed border-outline-variant/50 text-on-surface-variant font-bold text-sm hover:border-primary hover:text-primary transition-all">
-                      View All Activity
-                    </button>
-                  </div>
-                </section>
-              </aside>
-            </div>
-          </>
-        );
-    }
-  };
-
-  return (
-    <div className="flex-1 p-4 md:p-8 bg-surface-container-lowest min-h-screen">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <button 
-            onClick={() => (window as any).toggleSidebar?.()}
-            className="lg:hidden p-2 -ml-2 text-on-surface-variant hover:text-primary transition-colors"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <div>
-            <h1 className="text-2xl md:text-4xl font-black text-primary">
-              {activeView === 'dashboard' ? 'Landlord Hub' : 
-               activeView === 'properties' ? 'My Properties' :
-               activeView === 'bookings' ? 'Booking Requests' :
-               activeView === 'messages' ? 'Student Enquiries' : 'Settings'}
-            </h1>
-            <p className="text-xs md:text-sm text-on-surface-variant font-medium">
-              {activeView === 'dashboard' ? 'Manage your properties and student reservations.' : 
-               activeView === 'properties' ? 'View and manage your listed accommodation.' :
-               activeView === 'bookings' ? 'Review and respond to booking requests.' :
-               activeView === 'messages' ? 'Communication with potential residents.' : 'Manage your account preferences.'}
-            </p>
-          </div>
-        </div>
-        {activeView === 'dashboard' && (
-          <button 
-            onClick={() => onViewChange('list-hostel')}
-            className="flex items-center px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-secondary-fixed text-on-secondary-fixed font-black text-sm md:text-lg hover-lift shadow-xl shadow-secondary-fixed/20"
-          >
-            <Building className="w-5 h-5 md:w-6 md:h-6 mr-2" />
-            Add New Hostel
-          </button>
-        )}
-      </header>
-
-      {renderContent()}
-    </div>
-  );
-};
-
 const ReviewSection = ({ hostel, user, reviews }: { hostel: Hostel, user: UserProfile | null, reviews: Review[] }) => {
   const [isComplaint, setIsComplaint] = useState(false);
   const [rating, setRating] = useState(5);
@@ -1312,23 +1109,29 @@ const StudentDashboard = ({
   bookings, 
   enquiries, 
   hostels, 
+  savedHostels,
   activeView, 
   onViewChange,
   onOpenPayment,
   onOpenInvoice,
   onSelectEnquiry,
-  onOpenHostelDetail
+  onOpenHostelDetail,
+  onSaveHostel,
+  onUnsaveHostel
 }: { 
   user: UserProfile, 
   bookings: Booking[], 
   enquiries: Enquiry[], 
   hostels: Hostel[], 
+  savedHostels: Hostel[],
   activeView: string, 
   onViewChange: (view: AppView) => void,
   onOpenPayment: () => void,
   onOpenInvoice: () => void,
   onSelectEnquiry: (e: Enquiry) => void,
-  onOpenHostelDetail: (h: Hostel) => void
+  onOpenHostelDetail: (h: Hostel) => void,
+  onSaveHostel: (hostelId: string) => void,
+  onUnsaveHostel: (hostelId: string) => void
 }) => {
   const renderContent = () => {
     switch (activeView) {
@@ -1424,14 +1227,19 @@ const StudentDashboard = ({
           <section>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-primary">Saved Hostels</h2>
-              <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold">{hostels.filter(h => h.verified).length} Items</span>
+              <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold">{savedHostels.length} Items</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {hostels.slice(0, 3).map((hostel, i) => (
-                <div key={`saved-hostel-${hostel.id || i}`} className="bg-white dark:bg-surface-container rounded-[2.5rem] overflow-hidden border border-outline-variant/30 hover:border-primary transition-all group editorial-shadow">
+              {savedHostels.length > 0 ? savedHostels.map((hostel) => (
+                <div key={`saved-hostel-${hostel.id}`} className="bg-white dark:bg-surface-container rounded-[2.5rem] overflow-hidden border border-outline-variant/30 hover:border-primary transition-all group editorial-shadow">
                   <div className="h-40 relative overflow-hidden">
                     <img src={hostel.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                    <button className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-error shadow-sm"><Heart className="w-4 h-4 fill-error" /></button>
+                    <button 
+                      onClick={() => onUnsaveHostel(hostel.id)}
+                      className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-error shadow-sm hover:bg-error hover:text-on-error transition-all"
+                    >
+                      <Heart className="w-4 h-4 fill-error" />
+                    </button>
                   </div>
                   <div className="p-6">
                     <h3 className="font-bold text-primary mb-1">{hostel.name}</h3>
@@ -1439,7 +1247,13 @@ const StudentDashboard = ({
                     <button onClick={() => onOpenHostelDetail(hostel)} className="w-full py-2 bg-primary/5 text-primary rounded-xl text-[10px] font-black hover:bg-primary hover:text-on-primary transition-all">View Details</button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="col-span-full text-center py-12">
+                  <Heart className="w-16 h-16 text-outline-variant mx-auto mb-4" />
+                  <p className="text-on-surface-variant font-medium">No saved hostels yet.</p>
+                  <p className="text-sm text-on-surface-variant/70 mt-2">Start exploring and save your favorite hostels!</p>
+                </div>
+              )}
             </div>
           </section>
         );
@@ -1919,6 +1733,8 @@ const mapHostel = (h: any): Hostel => ({
   landlordId: h.landlord_id,
   landlordName: h.landlord_name,
   bookingFee: h.booking_fee || 0,
+  totalRooms: h.total_rooms || 0,
+  availableRooms: h.available_rooms || 0,
   paymentDetails: h.payment_details || {}
 });
 
@@ -1966,13 +1782,33 @@ const mapReview = (r: any): Review => ({
   createdAt: r.created_at
 });
 
+const mapProfile = (p: any): UserProfile => ({
+  uid: p.id,
+  email: p.email,
+  name: p.name,
+  role: p.role,
+  phone: p.phone,
+  bio: p.bio,
+  university: p.university,
+  address: p.address,
+  photoURL: p.photo_url,
+  verified: p.verified || false,
+  adminApproved: p.admin_approved || false,
+  documents: p.documents || []
+});
+
 // --- Error Boundary ---
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
-class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+class GlobalErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  declare public readonly props: ErrorBoundaryProps;
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -1986,7 +1822,7 @@ class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode },
     console.error("CRITICAL UI CRASH:", error, errorInfo);
   }
 
-  public render() {
+  public render(): React.ReactNode {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-surface p-10 flex flex-col items-center justify-center text-center">
@@ -2012,7 +1848,7 @@ class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode },
         </div>
       );
     }
-    return this.props.children;
+    return <>{this.props.children}</>;
   }
 }
 
@@ -2045,14 +1881,131 @@ function MainApp() {
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [hostels, setHostels] = useState<Hostel[]>(MOCK_HOSTELS);
+  const [pendingLandlords, setPendingLandlords] = useState<UserProfile[]>([]);
+  const [savedHostels, setSavedHostels] = useState<Hostel[]>([]);
+
+  const handleAcceptBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'confirmed' })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+      alert("Booking accepted successfully!");
+      // Refresh bookings data
+      const { data: updatedBookings } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('landlord_id', user?.uid);
+      if (updatedBookings) setBookings(updatedBookings.map(mapBooking));
+    } catch (error) {
+      handleSupabaseError(error, OperationType.UPDATE, 'bookings');
+    }
+  };
+
+  const handleDeclineBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+      alert("Booking declined.");
+      // Refresh bookings data
+      const { data: updatedBookings } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('landlord_id', user?.uid);
+      if (updatedBookings) setBookings(updatedBookings.map(mapBooking));
+    } catch (error) {
+      handleSupabaseError(error, OperationType.UPDATE, 'bookings');
+    }
+  };
+
+  const handleReplyEnquiry = async (enquiryId: string, reply: string) => {
+    try {
+      const { error } = await supabase
+        .from('enquiries')
+        .update({ 
+          status: 'replied',
+          reply_message: reply 
+        })
+        .eq('id', enquiryId);
+
+      if (error) throw error;
+      alert("Reply sent successfully!");
+      // Refresh enquiries data
+      const { data: updatedEnquiries } = await supabase
+        .from('enquiries')
+        .select('*')
+        .eq('landlord_id', user?.uid);
+      if (updatedEnquiries) setEnquiries(updatedEnquiries.map(mapEnquiry));
+    } catch (error) {
+      handleSupabaseError(error, OperationType.UPDATE, 'enquiries');
+    }
+  };
+
+  const handleSaveHostel = async (hostelId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('saved_hostels')
+        .insert({ student_id: user.uid, hostel_id: hostelId });
+
+      if (error) throw error;
+      // Refresh saved hostels
+      const { data: updatedSaved } = await supabase
+        .from('saved_hostels')
+        .select(`
+          hostel_id,
+          hostels (*)
+        `)
+        .eq('student_id', user.uid);
+      if (updatedSaved) {
+        const saved = updatedSaved.map(item => mapHostel(item.hostels as any));
+        setSavedHostels(saved);
+      }
+    } catch (error) {
+      handleSupabaseError(error, OperationType.CREATE, 'saved_hostels');
+    }
+  };
+
+  const handleUnsaveHostel = async (hostelId: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('saved_hostels')
+        .delete()
+        .eq('student_id', user.uid)
+        .eq('hostel_id', hostelId);
+
+      if (error) throw error;
+      // Refresh saved hostels
+      const { data: updatedSaved } = await supabase
+        .from('saved_hostels')
+        .select(`
+          hostel_id,
+          hostels (*)
+        `)
+        .eq('student_id', user.uid);
+      if (updatedSaved) {
+        const saved = updatedSaved.map(item => mapHostel(item.hostels as any));
+        setSavedHostels(saved);
+      }
+    } catch (error) {
+      handleSupabaseError(error, OperationType.DELETE, 'saved_hostels');
+    }
+  };
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const heroImages = [
-    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=2000',
-    'https://images.unsplash.com/photo-1555854817-5b2260d1bc63?auto=format&fit=crop&q=80&w=2000',
-    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=2000'
+    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1555854817-5b2260d1bc63?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=1200'
   ];
 
   useEffect(() => {
@@ -2277,6 +2230,84 @@ function MainApp() {
     };
   }, [isLoggedIn, user]);
 
+  // Real-time Pending Landlords (Admin only)
+  useEffect(() => {
+    if (!isLoggedIn || !user || user.role !== 'admin') {
+      setPendingLandlords([]);
+      return;
+    }
+
+    const fetchPendingLandlords = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'landlord')
+        .eq('admin_approved', false);
+
+      if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
+      else if (data) setPendingLandlords(data.map(mapProfile));
+    };
+
+    fetchPendingLandlords();
+
+    const channel = supabase
+      .channel('public:profiles')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'profiles'
+      }, () => {
+        fetchPendingLandlords();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLoggedIn, user]);
+
+  // Real-time Saved Hostels (Students only)
+  useEffect(() => {
+    if (!isLoggedIn || !user || user.role !== 'student') {
+      setSavedHostels([]);
+      return;
+    }
+
+    const fetchSavedHostels = async () => {
+      const { data, error } = await supabase
+        .from('saved_hostels')
+        .select(`
+          hostel_id,
+          hostels (*)
+        `)
+        .eq('student_id', user.uid);
+
+      if (error) handleSupabaseError(error, OperationType.LIST, 'saved_hostels');
+      else if (data) {
+        const saved = data.map(item => mapHostel(item.hostels as any));
+        setSavedHostels(saved);
+      }
+    };
+
+    fetchSavedHostels();
+
+    const channel = supabase
+      .channel('public:saved_hostels')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'saved_hostels',
+        filter: `student_id=eq.${user.uid}`
+      }, () => {
+        fetchSavedHostels();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isLoggedIn, user]);
+
   // Real-time Reviews
   useEffect(() => {
     if (!isLoggedIn || !user) {
@@ -2343,6 +2374,14 @@ function MainApp() {
       h.location.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, hostels]);
+
+  const activePaymentBooking = selectedBooking ?? bookings.find(b => b.paymentStatus !== 'fully_paid') ?? bookings[0] ?? null;
+  const activePaymentHostel = activePaymentBooking
+    ? hostels.find(h => h.id === activePaymentBooking.hostelId) ?? null
+    : null;
+  const activeInvoiceHostel = selectedBooking
+    ? hostels.find(h => h.id === selectedBooking.hostelId) ?? null
+    : null;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2453,21 +2492,23 @@ function MainApp() {
 
       if (fetchError) throw fetchError;
       
-      const newAmountPaid = (booking.amountFull || 0) + amount;
-      let newPaymentStatus: Booking['paymentStatus'] = 'partially_paid';
+      const currentAmountPaid = Number(booking.amount_paid || 0);
+      const totalAmount = Number(booking.total_amount || 0);
+      const bookingFee = Number(booking.booking_fee || 0);
+      const newAmountPaid = currentAmountPaid + amount;
+      const newPaymentStatus: Booking['paymentStatus'] =
+        newAmountPaid >= totalAmount ? 'fully_paid' :
+        newAmountPaid > 0 ? 'partially_paid' :
+        'unpaid';
+      const newStatus: Booking['status'] =
+        newAmountPaid >= (totalAmount * 0.5 + bookingFee) ? 'confirmed' : 'pending';
       
-      if (newAmountPaid >= booking.total_amount) {
-        newPaymentStatus = 'fully_paid';
-      } else if (newAmountPaid > 0) {
-        newPaymentStatus = 'partially_paid';
-      }
-
       const { error: updateError } = await supabase
         .from('bookings')
         .update({
           amount_paid: newAmountPaid,
           payment_status: newPaymentStatus,
-          status: newAmountPaid >= (booking.total_amount / 2) ? 'confirmed' : 'pending',
+          status: newStatus,
           receipt_image: receiptUrl || booking.receipt_image
         })
         .eq('id', bookingId);
@@ -2475,6 +2516,15 @@ function MainApp() {
       if (updateError) throw updateError;
       
       setReceiptImage(null);
+      setSelectedBooking({
+        ...mapBooking({
+          ...booking,
+          amount_paid: newAmountPaid,
+          payment_status: newPaymentStatus,
+          status: newStatus,
+          receipt_image: receiptUrl || booking.receipt_image
+        })
+      });
       navigateTo('dashboard');
     } catch (error) {
       handleSupabaseError(error, OperationType.UPDATE, 'bookings');
@@ -2524,9 +2574,9 @@ function MainApp() {
 
       if (error) throw error;
       
-      setSelectedBooking(data as unknown as Booking);
+      setSelectedBooking(mapBooking(data));
       setSelectedHostel(hostel);
-      navigateTo('payment');
+      navigateTo('booking-confirmation');
     } catch (error) {
       handleSupabaseError(error, OperationType.CREATE, 'bookings');
     }
@@ -2560,6 +2610,8 @@ function MainApp() {
 
     const formData = new FormData(e.target as HTMLFormElement);
     const selectedAmenities = Array.from(formData.getAll('amenities')) as string[];
+    const totalRooms = Number(formData.get('totalRooms') || formData.get('rooms') || 0);
+    const availableRooms = isEditingHostel ? editingHostel?.availableRooms ?? totalRooms : totalRooms;
     
     try {
       const hostelData = {
@@ -2575,13 +2627,18 @@ function MainApp() {
           tnmMpamba: formData.get('tnmMpamba') as string,
           bankName: formData.get('bankName') as string,
           bankAccount: formData.get('bankAccount') as string,
-        }
+        },
+        total_rooms: totalRooms,
+        available_rooms: availableRooms
       };
 
       if (isEditingHostel && editingHostel) {
         const { error } = await supabase
           .from('hostels')
-          .update(hostelData)
+          .update({
+            ...hostelData,
+            verified: editingHostel.verified ?? false,
+          })
           .eq('id', editingHostel.id);
         if (error) throw error;
       } else {
@@ -2667,6 +2724,7 @@ function MainApp() {
         .eq('id', user.uid);
       
       if (error) throw error;
+      setUser(prev => prev ? { ...prev, ...updatedData } : prev);
       alert("Profile updated successfully!");
     } catch (error) {
       handleSupabaseError(error, OperationType.UPDATE, `profiles/${user.uid}`);
@@ -2682,7 +2740,7 @@ function MainApp() {
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${darkMode ? 'dark bg-surface text-on-surface' : 'bg-surface text-on-surface'}`}>
       {view !== 'dashboard' && (
-        <Navbar 
+        <LayoutNavbar 
           onViewChange={navigateTo} 
           isMenuOpen={isMobileMenuOpen} 
           setIsMenuOpen={setIsMobileMenuOpen} 
@@ -2697,381 +2755,72 @@ function MainApp() {
       )}
 
       <main className="flex-grow">
-        <AnimatePresence mode="wait">
+        <Suspense fallback={<ScreenFallback />}>
+          <AnimatePresence mode="wait">
+          {view === 'booking-confirmation' && selectedBooking && selectedHostel && (
+            <BookingConfirmationView
+              booking={selectedBooking}
+              hostel={selectedHostel}
+              onProceedToPayment={() => navigateTo('payment')}
+              onGoToDashboard={() => navigateTo('dashboard')}
+              onViewChange={navigateTo}
+            />
+          )}
+
           {view === 'payment' && selectedBooking && selectedHostel && (
-            <motion.div
-              key="payment"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-4xl mx-auto px-4 py-20 w-full"
-            >
-              <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-10 border border-outline-variant/30">
-                <div className="flex flex-col md:flex-row gap-12">
-                  <div className="flex-1">
-                    <h2 className="text-3xl font-black text-primary mb-6">Secure Your Place</h2>
-                    <p className="text-on-surface-variant mb-8">
-                      To secure your room at <span className="font-bold text-primary">{selectedBooking.hostelName}</span>, you need to pay at least half of the monthly rent plus the booking fee.
-                    </p>
-
-                    <div className="space-y-4 mb-8 bg-surface-container p-6 rounded-2xl">
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Monthly Rent</span>
-                        <span className="font-bold">MK{selectedBooking.totalAmount?.toLocaleString() || '0'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Booking Fee</span>
-                        <span className="font-bold">MK{selectedBooking.bookingFee?.toLocaleString() || '0'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Down Payment (50%)</span>
-                        <span className="font-bold">MK{(selectedBooking.totalAmount * 0.5)?.toLocaleString() || '0'}</span>
-                      </div>
-                      <div className="border-t border-outline-variant/30 pt-4">
-                        <div className="flex justify-between text-lg font-black text-primary">
-                          <span>Total Initial Deposit</span>
-                          <span>MK{(selectedBooking.totalAmount * 0.5 + selectedBooking.bookingFee).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-bold text-on-surface-variant mt-1">
-                          <span>Total Amount to be Paid</span>
-                          <span>MK{(selectedBooking.totalAmount + selectedBooking.bookingFee).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <h3 className="text-xl font-bold text-primary">Landlord Payment Details</h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        {selectedHostel.paymentDetails?.airtelMoney && (
-                          <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
-                              <div>
-                                <div className="text-xs font-bold text-red-600 uppercase">Airtel Money</div>
-                                <div className="font-mono font-bold">{selectedHostel.paymentDetails.airtelMoney}</div>
-                              </div>
-                            </div>
-                            <button className="text-xs font-bold text-red-600 hover:underline">Copy</button>
-                          </div>
-                        )}
-                        {selectedHostel.paymentDetails?.tnmMpamba && (
-                          <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-xl border border-green-100 dark:border-green-900/20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold">T</div>
-                              <div>
-                                <div className="text-xs font-bold text-green-600 uppercase">TNM Mpamba</div>
-                                <div className="font-mono font-bold">{selectedHostel.paymentDetails.tnmMpamba}</div>
-                              </div>
-                            </div>
-                            <button className="text-xs font-bold text-green-600 hover:underline">Copy</button>
-                          </div>
-                        )}
-                        {selectedHostel.paymentDetails?.bankName && (
-                          <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">B</div>
-                              <div>
-                                <div className="text-xs font-bold text-blue-600 uppercase">{selectedHostel.paymentDetails.bankName}</div>
-                                <div className="font-mono font-bold">{selectedHostel.paymentDetails.bankAccount}</div>
-                              </div>
-                            </div>
-                            <button className="text-xs font-bold text-blue-600 hover:underline">Copy</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full md:w-80 space-y-6">
-                    <div className="p-6 bg-surface-container rounded-3xl border border-outline-variant/30">
-                      <h4 className="font-bold text-primary mb-4">Confirm Payment</h4>
-                      <p className="text-xs text-on-surface-variant mb-6">
-                        Once you have made the transfer using any of the methods provided, enter the amount paid below to update your booking status.
-                      </p>
-                      <form onSubmit={(e) => {
-                        e.preventDefault();
-                        const amount = Number(new FormData(e.currentTarget).get('amount'));
-                        if (!receiptImage) {
-                          alert("Please upload a receipt as proof of payment.");
-                          return;
-                        }
-                        handleConfirmPayment(selectedBooking.id, amount, receiptImage);
-                      }} className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Amount Paid (MK)</label>
-                          <input name="amount" type="number" required className="w-full p-3 rounded-xl bg-white dark:bg-surface-container-high border border-outline-variant/30 focus:ring-2 focus:ring-primary" placeholder="e.g. 25000" />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Upload Receipt (Proof of Payment)</label>
-                          <div className="relative border-2 border-dashed border-outline-variant rounded-xl p-4 hover:border-primary transition-colors cursor-pointer text-center">
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              required
-                              onChange={handleReceiptUpload}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                            />
-                            {receiptImage ? (
-                              <div className="flex items-center justify-center gap-2 text-primary">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span className="text-xs font-bold">Receipt Uploaded</span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-1">
-                                <Upload className="w-5 h-5 text-on-surface-variant" />
-                                <span className="text-[10px] font-bold text-on-surface-variant">Click to upload receipt</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <button type="submit" className="w-full py-4 rounded-xl bg-primary text-on-primary font-bold hover-lift shadow-lg">
-                          Confirm Payment
-                        </button>
-                      </form>
-                    </div>
-                    <button 
-                      onClick={() => navigateTo('dashboard')}
-                      className="w-full py-4 rounded-xl bg-surface-container text-on-surface-variant font-bold hover:bg-surface-container-high transition-colors"
-                    >
-                      Pay Later
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            <PaymentModalView
+              selectedBooking={selectedBooking}
+              selectedHostel={selectedHostel}
+              receiptImage={receiptImage}
+              onReceiptUpload={handleReceiptUpload}
+              onConfirmPayment={handleConfirmPayment}
+              onClose={() => navigateTo('dashboard')}
+            />
           )}
 
-          {view === 'login' && (
-            <motion.div
-              key="login"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-md mx-auto px-4 py-20 w-full"
-            >
-              <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-10 border border-outline-variant/30">
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-primary rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-xl overflow-hidden">
-                    <img 
-                      src="/logo.jpg" 
-                      alt="myHostel Logo" 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-black text-primary">Welcome Back</h2>
-                  <p className="text-on-surface-variant mt-2">Sign in to your account</p>
-                </div>
-
-                <div className="flex bg-surface-container p-1 rounded-2xl mb-8">
-                  <button 
-                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${loginRole === 'student' ? 'bg-white dark:bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant'}`}
-                    onClick={() => setLoginRole('student')}
-                  >
-                    Student
-                  </button>
-                  <button 
-                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${loginRole === 'landlord' ? 'bg-white dark:bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant'}`}
-                    onClick={() => setLoginRole('landlord')}
-                  >
-                    Landlord
-                  </button>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-6">
-                  {authError && (
-                    <div className="p-4 bg-error/10 text-error text-sm rounded-xl border border-error/20 flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                      {authError}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Email Address</label>
-                    <input 
-                      type="email" 
-                      required 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary" 
-                      placeholder="email@example.com" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Password</label>
-                    <input 
-                      type="password" 
-                      required 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary" 
-                      placeholder="••••••••" 
-                    />
-                  </div>
-                  <button 
-                    type="submit" 
-                    disabled={authLoading}
-                    className="w-full py-5 rounded-2xl bg-primary text-on-primary font-black text-lg hover-lift interactive-scale shadow-xl disabled:opacity-50 flex items-center justify-center"
-                  >
-                    {authLoading ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : 'Sign In'}
-                  </button>
-
-                  <div className="relative py-4">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-outline-variant/30"></div></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-surface-container px-2 text-on-surface-variant font-bold">Or continue with</span></div>
-                  </div>
-
-                  <button 
-                    type="button"
-                    onClick={() => handleGoogleAuth(loginRole)}
-                    disabled={authLoading}
-                    className="w-full py-4 rounded-2xl bg-surface-container text-on-surface font-bold hover-lift interactive-scale border border-outline-variant/30 flex items-center justify-center gap-3 disabled:opacity-50"
-                  >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" alt="" />
-                    Google
-                  </button>
-                </form>
-
-                <div className="mt-8 pt-8 border-t border-outline-variant/30 text-center">
-                  <p className="text-on-surface-variant text-sm">
-                    Don't have an account? <span onClick={() => setView('signup')} className="text-primary font-bold cursor-pointer hover:underline">Create one</span>
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {view === 'signup' && (
-            <motion.div
-              key="signup"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-md mx-auto px-4 py-20 w-full"
-            >
-              <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-10 border border-outline-variant/30">
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-secondary-fixed rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg overflow-hidden">
-                    <img 
-                      src="https://images.unsplash.com/photo-1592591502238-028381bb5017?auto=format&fit=crop&q=80&w=200" 
-                      alt="MyHostel Logo" 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-black text-primary">Create Account</h2>
-                  <p className="text-on-surface-variant mt-2">Join the myHostel community</p>
-                </div>
-
-                <div className="flex bg-surface-container p-1 rounded-2xl mb-8">
-                  <button 
-                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${signupRole === 'student' ? 'bg-white dark:bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant'}`}
-                    onClick={() => setSignupRole('student')}
-                  >
-                    Student
-                  </button>
-                  <button 
-                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${signupRole === 'landlord' ? 'bg-white dark:bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant'}`}
-                    onClick={() => setSignupRole('landlord')}
-                  >
-                    Landlord
-                  </button>
-                </div>
-
-                <form onSubmit={handleSignup} className="space-y-6">
-                  {authError && (
-                    <div className="p-4 bg-error/10 text-error text-sm rounded-xl border border-error/20 flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                      {authError}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Full Name</label>
-                    <input 
-                      type="text" 
-                      required 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary" 
-                      placeholder="John Doe" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Email Address</label>
-                    <input 
-                      type="email" 
-                      required 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary" 
-                      placeholder="email@example.com" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Password</label>
-                    <input 
-                      type="password" 
-                      required 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary" 
-                      placeholder="••••••••" 
-                    />
-                  </div>
-                  <button 
-                    type="submit" 
-                    disabled={authLoading}
-                    className="w-full py-5 rounded-2xl bg-primary text-on-primary font-black text-lg hover-lift interactive-scale shadow-xl disabled:opacity-50 flex items-center justify-center"
-                  >
-                    {authLoading ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : 'Create Account'}
-                  </button>
-
-                  <div className="relative py-4">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-outline-variant/30"></div></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-surface-container px-2 text-on-surface-variant font-bold">Or continue with</span></div>
-                  </div>
-
-                  <button 
-                    type="button"
-                    onClick={() => handleGoogleAuth(signupRole)}
-                    disabled={authLoading}
-                    className="w-full py-4 rounded-2xl bg-surface-container text-on-surface font-bold hover-lift interactive-scale border border-outline-variant/30 flex items-center justify-center gap-3 disabled:opacity-50"
-                  >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" alt="" />
-                    Google
-                  </button>
-                </form>
-
-                <div className="mt-8 pt-8 border-t border-outline-variant/30 text-center">
-                  <p className="text-on-surface-variant text-sm">
-                    Already have an account? <span onClick={() => setView('login')} className="text-primary font-bold cursor-pointer hover:underline">Sign in</span>
-                  </p>
-                </div>
-              </div>
-            </motion.div>
+          {(view === 'login' || view === 'signup') && (
+            <AuthView
+              mode={view}
+              loginRole={loginRole}
+              signupRole={signupRole}
+              email={email}
+              password={password}
+              name={name}
+              authLoading={authLoading}
+              authError={authError}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              onNameChange={setName}
+              onLoginRoleChange={setLoginRole}
+              onSignupRoleChange={setSignupRole}
+              onLogin={handleLogin}
+              onSignup={handleSignup}
+              onGoogleAuth={handleGoogleAuth}
+              onBack={handleBack}
+              onViewChange={navigateTo}
+            />
           )}
 
           {view === 'dashboard' && user && (
             <div className="flex flex-col lg:flex-row min-h-screen bg-surface-container-lowest overflow-x-hidden">
-              <Sidebar 
-                user={user} 
-                activeView={activeDashboardView} 
+              <LayoutSidebar
+                user={user}
+                activeView={activeDashboardView}
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
                 onViewChange={(v) => {
-                  if (['dashboard', 'bookings', 'messages', 'saved', 'settings', 'approvals', 'moderation', 'properties'].includes(v)) {
+                  if (['dashboard', 'bookings', 'messages', 'saved', 'settings', 'approvals', 'moderation', 'properties', 'transactions', 'complaints'].includes(v)) {
                     setActiveDashboardView(v);
                   } else {
                     navigateTo(v as AppView);
                   }
-                }} 
-                onLogout={handleLogout} 
+                }}
+                onLogout={handleLogout}
               />
               {user.role === 'admin' ? (
-                <AdminDashboard 
-                  user={user} 
-                  activeView={activeDashboardView} 
+                <AdminDashboardView
+                  user={user}
+                  activeView={activeDashboardView}
                   onViewChange={(v) => {
                     if (['dashboard', 'approvals', 'moderation', 'settings', 'complaints'].includes(v)) {
                       setActiveDashboardView(v);
@@ -3081,16 +2830,19 @@ function MainApp() {
                   }}
                   reviews={reviews}
                   hostels={hostels}
+                  pendingLandlords={pendingLandlords}
                   onViewHostel={(h) => {
                     setSelectedHostel(h);
                     setView('detail');
                   }}
                 />
               ) : user.role === 'landlord' ? (
-                <LandlordDashboard 
-                  user={user} 
-                  hostels={hostels} 
+                <LandlordDashboardView
+                  user={user}
+                  hostels={hostels}
+                  bookings={bookings}
                   activeView={activeDashboardView}
+                  enquiries={enquiries}
                   onViewChange={navigateTo}
                   onEdit={(h) => {
                     setEditingHostel(h);
@@ -3098,15 +2850,23 @@ function MainApp() {
                     navigateTo('list-hostel');
                   }}
                   onDelete={handleDeleteHostel}
+                  onAcceptBooking={handleAcceptBooking}
+                  onDeclineBooking={handleDeclineBooking}
+                  onOpenHostelDetail={(h) => {
+                    setSelectedHostel(h);
+                    setView('detail');
+                  }}
+                  onReplyEnquiry={handleReplyEnquiry}
                 />
               ) : (
-                <StudentDashboard 
-                  user={user} 
-                  bookings={bookings} 
-                  enquiries={enquiries} 
-                  hostels={hostels} 
+                <StudentDashboardView
+                  user={user}
+                  bookings={bookings}
+                  enquiries={enquiries}
+                  hostels={hostels}
+                  savedHostels={savedHostels}
                   activeView={activeDashboardView}
-                  onViewChange={navigateTo} 
+                  onViewChange={navigateTo}
                   onOpenPayment={() => setShowPaymentModal(true)}
                   onOpenInvoice={() => setShowInvoiceModal(true)}
                   onSelectEnquiry={(e) => setSelectedEnquiry(e)}
@@ -3114,6 +2874,8 @@ function MainApp() {
                     setSelectedHostel(h);
                     setView('detail');
                   }}
+                  onSaveHostel={handleSaveHostel}
+                  onUnsaveHostel={handleUnsaveHostel}
                 />
               )}
             </div>
@@ -3121,126 +2883,23 @@ function MainApp() {
 
           {/* Modals */}
           <AnimatePresence>
-            {showPaymentModal && (
-              <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-white dark:bg-surface-container rounded-[3rem] p-8 max-w-md w-full shadow-2xl border border-outline-variant/30"
-                >
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-2xl font-black text-primary">Secure Payment</h3>
-                    <button onClick={() => setShowPaymentModal(false)} className="p-2 hover:bg-surface-container rounded-full"><X className="w-6 h-6" /></button>
-                  </div>
-                  <div className="space-y-6">
-                    <div className="p-6 bg-surface-container-low rounded-3xl border border-outline-variant/10">
-                      <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Amount to Pay</p>
-                      <p className="text-3xl font-black text-primary">MK 45,000</p>
-                    </div>
-                    <div className="space-y-3">
-                      <button className="w-full py-4 bg-surface-container text-primary rounded-2xl font-bold flex items-center justify-between px-6 hover:bg-primary/5 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-error/10 rounded-lg flex items-center justify-center text-error font-black">A</div>
-                          Airtel Money
-                        </div>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <button className="w-full py-4 bg-surface-container text-primary rounded-2xl font-bold flex items-center justify-between px-6 hover:bg-primary/5 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary font-black">M</div>
-                          TNM Mpamba
-                        </div>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <button className="w-full py-4 bg-surface-container text-primary rounded-2xl font-bold flex items-center justify-between px-6 hover:bg-primary/5 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="w-5 h-5 text-tertiary" />
-                          Bank Transfer
-                        </div>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-center text-on-surface-variant font-medium">
-                      Payments are processed securely. Your booking will be confirmed within 24 hours of payment verification.
-                    </p>
-                  </div>
-                </motion.div>
-              </div>
+            {showPaymentModal && activePaymentBooking && activePaymentHostel && (
+              <PaymentModalView
+                selectedBooking={activePaymentBooking}
+                selectedHostel={activePaymentHostel}
+                receiptImage={receiptImage}
+                onReceiptUpload={handleReceiptUpload}
+                onConfirmPayment={handleConfirmPayment}
+                onClose={() => setShowPaymentModal(false)}
+              />
             )}
 
-            {showInvoiceModal && (
-              <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-white dark:bg-surface-container rounded-[3rem] p-8 max-w-2xl w-full shadow-2xl border border-outline-variant/30 overflow-y-auto max-h-[90vh]"
-                >
-                  <div className="flex justify-between items-center mb-8">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                        <FileText className="text-white w-6 h-6" />
-                      </div>
-                      <h3 className="text-2xl font-black text-primary">Invoice #INV-2024-088</h3>
-                    </div>
-                    <button onClick={() => setShowInvoiceModal(false)} className="p-2 hover:bg-surface-container rounded-full"><X className="w-6 h-6" /></button>
-                  </div>
-                  
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-2">Billed To</p>
-                        <p className="font-bold text-primary">{user.name}</p>
-                        <p className="text-sm text-on-surface-variant">{user.email}</p>
-                        <p className="text-sm text-on-surface-variant">{user.university || 'UNIMA'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-2">Issued By</p>
-                        <p className="font-bold text-primary">myHostel Malawi</p>
-                        <p className="text-sm text-on-surface-variant">Lilongwe, Area 47</p>
-                        <p className="text-sm text-on-surface-variant">support@myhostel.mw</p>
-                      </div>
-                    </div>
-
-                    <div className="border border-outline-variant/20 rounded-3xl overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead className="bg-surface-container">
-                          <tr>
-                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">Description</th>
-                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-outline-variant/10">
-                          <tr>
-                            <td className="p-4 text-sm font-medium text-primary">Booking Deposit - Sunnyside Elite</td>
-                            <td className="p-4 text-sm font-bold text-primary text-right">MK 45,000</td>
-                          </tr>
-                          <tr>
-                            <td className="p-4 text-sm font-medium text-primary">Service Fee</td>
-                            <td className="p-4 text-sm font-bold text-primary text-right">MK 5,000</td>
-                          </tr>
-                        </tbody>
-                        <tfoot className="bg-surface-container-low">
-                          <tr>
-                            <td className="p-4 text-sm font-black text-primary">Total Amount</td>
-                            <td className="p-4 text-lg font-black text-secondary-fixed text-right">MK 50,000</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <button className="flex-1 py-4 bg-primary text-on-primary rounded-2xl font-black hover-lift flex items-center justify-center gap-2">
-                        <CreditCard className="w-5 h-5" /> Pay Now
-                      </button>
-                      <button className="flex-1 py-4 bg-surface-container text-primary rounded-2xl font-black hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2">
-                        <Upload className="w-5 h-5" /> Download PDF
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
+            {showInvoiceModal && selectedBooking && activeInvoiceHostel && (
+              <InvoiceModalView
+                booking={selectedBooking}
+                hostel={activeInvoiceHostel}
+                onClose={() => setShowInvoiceModal(false)}
+              />
             )}
 
             {selectedEnquiry && (
@@ -3304,772 +2963,69 @@ function MainApp() {
           {/* OLD LANDLORD DASHBOARD REMOVED */}
 
           {view === 'home' && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="relative"
-            >
-              {/* Hero Section */}
-              <section className="relative h-[65vh] md:h-[85vh] flex items-center overflow-hidden">
-                <AnimatePresence initial={false}>
-                  <motion.div 
-                    key={heroImageIndex}
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '-100%' }}
-                    transition={{ type: 'tween', duration: 0.8, ease: 'linear' }}
-                    className="absolute inset-0 z-0 bg-black"
-                  >
-                    <img 
-                      src={heroImages[heroImageIndex]} 
-                      className="w-full h-full object-cover brightness-[0.4]"
-                      alt="Students studying"
-                      referrerPolicy="no-referrer"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-                
-                <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white w-full border-box">
-                  <motion.div
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="max-w-2xl"
-                  >
-                    <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-8 leading-[1.1]">
-                      Find Your Perfect <span className="text-secondary-fixed">Study Haven</span> in Malawi.
-                    </h1>
-                    
-                    <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 max-w-xl">
-                      <div className="relative flex-grow">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                        <input 
-                          type="text" 
-                          placeholder="Search by university or location..."
-                          className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-surface-container text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary-fixed shadow-xl"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                      <button 
-                        type="submit"
-                        className="bg-secondary-fixed text-on-secondary-fixed px-8 py-4 rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl whitespace-nowrap"
-                      >
-                        Search Now
-                      </button>
-                    </form>
-                  </motion.div>
-                </div>
-              </section>
-
-              {/* Featured Hostels Section */}
-              <section className="py-24 bg-white dark:bg-surface-container-lowest">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-                    <div>
-                      <h2 className="text-2xl md:text-5xl font-black text-primary mb-4">Featured Hostels</h2>
-                      <p className="text-on-surface-variant max-w-xl font-medium">Hand-picked premium accommodations verified for safety and comfort.</p>
-                    </div>
-                    <button 
-                      onClick={() => navigateTo('listings')}
-                      className="group flex items-center gap-2 text-primary font-black hover:gap-3 transition-all"
-                    >
-                      View All Listings <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {MOCK_HOSTELS.slice(0, 3).map((hostel) => (
-                      <div 
-                        key={`featured-${hostel.id}`}
-                        className="bg-surface-container-low rounded-[2.5rem] overflow-hidden border border-outline-variant/20 group cursor-pointer hover-lift transition-all"
-                        onClick={() => {
-                          setSelectedHostel(hostel);
-                          navigateTo('detail');
-                        }}
-                      >
-                        <div className="relative h-64 overflow-hidden">
-                          <img 
-                            src={hostel.image} 
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                            alt={hostel.name}
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="absolute top-4 left-4">
-                            <span className="glass-effect text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                              {hostel.university}
-                            </span>
-                          </div>
-                          <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-surface-container/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg">
-                            <span className="text-primary font-black text-lg">MK{hostel.price.toLocaleString()}</span>
-                            <span className="text-on-surface-variant text-[10px] font-bold uppercase ml-1">/mo</span>
-                          </div>
-                        </div>
-                        <div className="p-8">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-xl font-black text-primary">{hostel.name}</h3>
-                            <div className="flex items-center bg-secondary-fixed/20 px-2 py-1 rounded-lg">
-                              <Star className="w-3 h-3 text-secondary fill-secondary mr-1" />
-                              <span className="text-xs font-black text-secondary">{hostel.rating}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center text-on-surface-variant text-xs font-bold mb-6">
-                            <MapPin className="w-3 h-3 mr-1" />
-                            {hostel.location}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {hostel.amenities.slice(0, 2).map((amenity, i) => (
-                              <span key={i} className="bg-surface-container px-3 py-1 rounded-full text-[10px] font-black text-on-surface-variant uppercase tracking-widest">
-                                {amenity}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Features Section */}
-              <section className="py-24 bg-surface-container-lowest">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="text-center mb-16">
-                    <h2 className="text-2xl md:text-5xl font-bold text-primary mb-4">Why Choose myHostel?</h2>
-                    <p className="text-on-surface-variant max-w-2xl mx-auto">We take the stress out of finding accommodation so you can focus on your studies.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                      { icon: ShieldCheck, title: 'Verified Listings', desc: 'Every hostel on our platform is physically inspected and verified by our team.' },
-                      { icon: Clock, title: 'Real-time Availability', desc: 'No more calling around. See instantly which rooms are available for the semester.' },
-                      { icon: Zap, title: 'Secure Payments', desc: 'Pay your deposit and rent securely through our integrated payment gateway.' }
-                    ].map((feature, i) => (
-                      <div key={i} className="p-8 rounded-3xl bg-surface-container hover:bg-white dark:hover:bg-surface-container-high hover:editorial-shadow transition-all group">
-                        <div className="w-14 h-14 bg-primary-container rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                          <feature.icon className="text-on-primary-container w-8 h-8" />
-                        </div>
-                        <h3 className="text-xl font-bold text-primary mb-3">{feature.title}</h3>
-                        <p className="text-on-surface-variant leading-relaxed">{feature.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Landlord CTA - Redesigned */}
-              <section className="py-24 px-4 sm:px-6 lg:px-8">
-                <div className="max-w-7xl mx-auto">
-                  <div className="bg-primary rounded-[3rem] overflow-hidden relative editorial-shadow group">
-                    {/* Decorative Elements */}
-                    <div className="absolute top-0 right-0 w-1/2 h-full bg-white/5 skew-x-12 translate-x-1/4 pointer-events-none"></div>
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-secondary-fixed/20 rounded-full blur-3xl pointer-events-none"></div>
-                    
-                    <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2">
-                      <div className="p-12 md:p-20 flex flex-col justify-center">
-                        <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] mb-8 w-fit">
-                          <Building className="w-3 h-3" />
-                          Partner with us
-                        </div>
-                        <h2 className="text-4xl md:text-6xl font-black text-white mb-8 leading-[1.1]">
-                          Maximize Your <span className="text-secondary-fixed italic">Hostel's Potential.</span>
-                        </h2>
-                        <p className="text-on-primary/70 text-lg md:text-xl font-medium mb-12 max-w-lg">
-                          Join Malawi's premier student housing network. Get verified, reach thousands of students, and manage bookings with ease.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-6">
-                          <button 
-                            onClick={() => isLoggedIn ? navigateTo('list-hostel') : navigateTo('login')}
-                            className="bg-secondary-fixed text-on-secondary-fixed px-10 py-5 rounded-2xl font-black text-lg hover-lift shadow-2xl shadow-black/20 flex items-center justify-center gap-3"
-                          >
-                            List Your Property <ArrowUpRight className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => navigateTo('support')}
-                            className="bg-white/10 text-white border border-white/20 px-10 py-5 rounded-2xl font-black text-lg hover:bg-white/20 transition-all flex items-center justify-center"
-                          >
-                            Learn More
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="relative hidden lg:block overflow-hidden">
-                        <img 
-                          src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000" 
-                          className="w-full h-full object-cover grayscale opacity-40 group-hover:scale-105 group-hover:opacity-60 transition-all duration-1000"
-                          alt="Modern office/hostel"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/50 to-transparent"></div>
-                        
-                        {/* Floating Stats Card */}
-                        <div className="absolute bottom-12 right-12 glass-effect p-8 rounded-[2rem] border border-white/20 shadow-2xl animate-float">
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 bg-secondary-fixed rounded-2xl flex items-center justify-center text-on-secondary-fixed">
-                              <Zap className="w-6 h-6" />
-                            </div>
-                            <div>
-                              <div className="text-2xl font-black text-white">40%</div>
-                              <div className="text-[10px] font-black text-white/60 uppercase tracking-widest">Faster Bookings</div>
-                            </div>
-                          </div>
-                          <div className="text-xs text-white/80 font-medium leading-relaxed">
-                            Landlords on our platform see a significant increase in early reservations.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </motion.div>
+            <HomeView
+              heroImageIndex={heroImageIndex}
+              heroImages={heroImages}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSearchSubmit={handleSearch}
+              featuredHostels={hostels}
+              isLoggedIn={isLoggedIn}
+              onViewChange={navigateTo}
+              onOpenHostel={(hostel) => {
+                setSelectedHostel(hostel);
+                setView('detail');
+              }}
+            />
           )}
 
           {view === 'listings' && (
-            <motion.div
-              key="listings"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-            >
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-primary mb-2">Available Hostels</h2>
-                  <p className="text-on-surface-variant">Showing {filteredHostels.length} results for your search</p>
-                </div>
-                <div className="relative w-full md:w-96">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                  <input 
-                    type="text" 
-                    placeholder="Filter results..."
-                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <motion.div 
-                variants={{
-                  hidden: { opacity: 0 },
-                  show: {
-                    opacity: 1,
-                    transition: {
-                      staggerChildren: 0.1
-                    }
-                  }
-                }}
-                initial="hidden"
-                animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-              >
-                {filteredHostels.map((hostel) => (
-                  <motion.div 
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      show: { opacity: 1, y: 0 }
-                    }}
-                    layoutId={`hostel-${hostel.id}`}
-                    key={hostel.id}
-                    className="bg-white dark:bg-surface-container rounded-[2rem] overflow-hidden editorial-shadow border border-outline-variant/20 group cursor-pointer hover-lift"
-                    onClick={() => openDetail(hostel)}
-                  >
-                    <div className="relative h-64 overflow-hidden">
-                      <img 
-                        src={hostel.image} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        alt={hostel.name}
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute top-4 left-4 flex gap-2">
-                        {hostel.verified && (
-                          <span className="bg-tertiary text-on-tertiary px-3 py-1 rounded-full text-xs font-bold flex items-center shadow-lg">
-                            <ShieldCheck className="w-3 h-3 mr-1" /> Verified
-                          </span>
-                        )}
-                        <span className="glass-effect text-primary px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                          {hostel.university}
-                        </span>
-                      </div>
-                      <div className="absolute bottom-4 right-4 bg-white/90 dark:bg-surface-container/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg">
-                        <span className="text-primary font-extrabold text-lg">MK{hostel.price.toLocaleString()}</span>
-                        <span className="text-on-surface-variant text-xs font-medium">/mo</span>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-xl font-bold text-primary">{hostel.name}</h3>
-                        <div className="flex items-center bg-secondary-fixed/20 px-2 py-1 rounded-lg">
-                          <Star className="w-4 h-4 text-secondary fill-secondary mr-1" />
-                          <span className="text-sm font-bold text-secondary">{hostel.rating}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center text-on-surface-variant text-sm mb-4">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {hostel.location}
-                      </div>
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        {hostel.amenities.slice(0, 3).map((amenity, i) => (
-                          <span key={`amenity-${hostel.id}-${i}`} className="bg-surface-container px-3 py-1 rounded-full text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                            {amenity}
-                          </span>
-                        ))}
-                      </div>
-                      <button className="w-full py-3 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-colors flex items-center justify-center group">
-                        View Details
-                        <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            </motion.div>
+            <ListingsView
+              hostels={filteredHostels}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onViewChange={navigateTo}
+              onOpenHostel={(hostel) => openDetail(hostel)}
+            />
           )}
 
           {view === 'list-hostel' && (
-            <motion.div
-              key="list-hostel"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20"
-            >
-              {user?.role !== 'landlord' ? (
-                <div className="text-center py-20 bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow border border-outline-variant/30">
-                  <ShieldAlert className="w-20 h-20 text-error mx-auto mb-6" />
-                  <h2 className="text-3xl font-black text-primary mb-4">Access Denied</h2>
-                  <p className="text-on-surface-variant mb-8 max-w-md mx-auto">Only registered landlords can list properties on myHostel. If you are a landlord, please sign in with a landlord account.</p>
-                  <button 
-                    onClick={() => navigateTo('home')}
-                    className="px-8 py-4 rounded-xl bg-primary text-on-primary font-bold hover-lift"
-                  >
-                    Return Home
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center mb-12">
-                    <h2 className="text-4xl font-black text-primary mb-4">{isEditingHostel ? 'Edit Your Property' : 'List Your Property'}</h2>
-                    <p className="text-on-surface-variant text-lg">{isEditingHostel ? 'Update your hostel details to keep students informed.' : 'Join Malawi\'s largest student housing network and reach thousands of students.'}</p>
-                  </div>
-
-                  <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-8 md:p-12 border border-outline-variant/30">
-                    <form onSubmit={handleListHostel} className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Hostel Name</label>
-                          <input name="name" type="text" required defaultValue={editingHostel?.name} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="e.g. Sunrise Villa" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Location</label>
-                          <input name="location" type="text" required defaultValue={editingHostel?.location} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="e.g. Area 47, Lilongwe" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Hostel Image (Inside or Outside)</label>
-                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-outline-variant rounded-3xl p-8 hover:border-primary transition-colors cursor-pointer relative group">
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={handleImageUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                          />
-                          {(uploadedImage || editingHostel?.image) ? (
-                            <div className="relative w-full aspect-video rounded-2xl overflow-hidden">
-                              <img src={uploadedImage || editingHostel?.image} className="w-full h-full object-cover" alt="Preview" />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Upload className="text-white w-10 h-10" />
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-center">
-                              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Camera className="text-primary w-8 h-8" />
-                              </div>
-                              <p className="text-on-surface-variant font-bold">Click or drag to upload image</p>
-                              <p className="text-on-surface-variant/60 text-sm">PNG, JPG up to 10MB</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Description</label>
-                        <textarea name="description" required defaultValue={editingHostel?.description} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary h-32" placeholder="Tell students about your hostel..."></textarea>
-                      </div>
-
-                      <div className="space-y-4">
-                        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Amenities</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                          {AMENITY_OPTIONS.map(option => (
-                            <label key={option} className="flex items-center space-x-3 p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 cursor-pointer hover:bg-surface-container transition-colors">
-                              <input 
-                                type="checkbox" 
-                                name="amenities" 
-                                value={option}
-                                defaultChecked={editingHostel?.amenities.includes(option)}
-                                className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"
-                              />
-                              <span className="text-sm font-medium text-on-surface">{option}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Monthly Price (MK)</label>
-                          <input name="price" type="number" required defaultValue={editingHostel?.price} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="45000" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Total Rooms</label>
-                          <input name="rooms" type="number" required className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="10" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">University Proximity</label>
-                          <select name="university" defaultValue={editingHostel?.university} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary">
-                            {UNIVERSITIES.map(uni => <option key={uni} value={uni}>{uni}</option>)}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6">
-                        <h3 className="text-xl font-bold text-primary">Payment Details (For Bookings)</h3>
-                        <p className="text-sm text-on-surface-variant">Provide the details where students should send their booking payments.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Airtel Money Number</label>
-                            <input name="airtelMoney" type="text" defaultValue={editingHostel?.paymentDetails?.airtelMoney} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="099..." />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">TNM Mpamba Number</label>
-                            <input name="tnmMpamba" type="text" defaultValue={editingHostel?.paymentDetails?.tnmMpamba} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="088..." />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Bank Name</label>
-                            <input name="bankName" type="text" defaultValue={editingHostel?.paymentDetails?.bankName} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="e.g. National Bank" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Bank Account Number</label>
-                            <input name="bankAccount" type="text" defaultValue={editingHostel?.paymentDetails?.bankAccount} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="Account number" />
-                          </div>
-                        </div>
-                      </div>
-                      <button type="submit" className="w-full py-5 rounded-2xl bg-primary text-on-primary font-black text-lg hover-lift interactive-scale shadow-xl">
-                        {isEditingHostel ? 'Update Hostel' : 'Submit for Verification'}
-                      </button>
-                    </form>
-                  </div>
-                </>
-              )}
-            </motion.div>
+            <HostelFormView
+              user={user}
+              isEditingHostel={isEditingHostel}
+              editingHostel={editingHostel}
+              uploadedImage={uploadedImage}
+              onImageUpload={handleImageUpload}
+              onListHostel={handleListHostel}
+              onBack={() => navigateTo('dashboard')}
+            />
           )}
 
-          {view === 'support' && (
-            <motion.div
-              key="support"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20"
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                <div>
-                  <h2 className="text-4xl md:text-5xl font-black text-primary mb-8 leading-tight">We're here to <span className="text-secondary-fixed">help</span> you settle in.</h2>
-                  <p className="text-on-surface-variant text-xl mb-12 leading-relaxed">Whether you're a student looking for a room or a landlord with questions, our team is ready to assist.</p>
-                  
-                  <div className="space-y-6">
-                    {[
-                      { q: "How do I book a room?", a: "Simply find a hostel you like, click 'Reserve Now', and our team will contact you to finalize the details." },
-                      { q: "Is my payment secure?", a: "Yes, we use industry-standard encryption and verified payment gateways for all transactions." },
-                      { q: "What does 'Verified' mean?", a: "It means our team has physically visited the property to ensure it meets our safety and quality standards." }
-                    ].map((faq, i) => (
-                      <div key={i} className="p-6 bg-white dark:bg-surface-container rounded-2xl border border-outline-variant/30 hover:border-primary transition-colors cursor-pointer group">
-                        <h4 className="font-bold text-primary mb-2 flex items-center">
-                          <CheckCircle2 className="w-5 h-5 mr-2 text-tertiary" />
-                          {faq.q}
-                        </h4>
-                        <p className="text-on-surface-variant text-sm group-hover:text-on-surface transition-colors">{faq.a}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-primary-container/10 p-12 rounded-[3rem] border border-primary/10">
-                  <h3 className="text-2xl font-bold text-primary mb-8">Send us a message</h3>
-                  <form className="space-y-6">
-                    <input type="text" placeholder="Your Name" className="w-full p-4 rounded-xl bg-white dark:bg-surface-container border-none focus:ring-2 focus:ring-primary" />
-                    <input type="email" placeholder="Your Email" className="w-full p-4 rounded-xl bg-white dark:bg-surface-container border-none focus:ring-2 focus:ring-primary" />
-                    <textarea placeholder="How can we help?" className="w-full p-4 rounded-xl bg-white dark:bg-surface-container border-none focus:ring-2 focus:ring-primary h-40"></textarea>
-                    <button className="w-full py-4 rounded-xl bg-primary text-on-primary font-bold hover-lift interactive-scale">Send Message</button>
-                  </form>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {view === 'support' && <SupportView />}
 
           {view === 'detail' && selectedHostel && (
-            <motion.div
-              key="detail"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-            >
-              <button 
-                onClick={() => setView('listings')}
-                className="flex items-center text-primary font-bold mb-8 hover:translate-x-[-4px] transition-transform"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Listings
-              </button>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                  <motion.div 
-                    layoutId={`hostel-${selectedHostel.id}`}
-                    className="rounded-[3rem] overflow-hidden h-[500px] shadow-2xl"
-                  >
-                    <img 
-                      src={selectedHostel.image} 
-                      className="w-full h-full object-cover"
-                      alt={selectedHostel.name}
-                      referrerPolicy="no-referrer"
-                    />
-                  </motion.div>
-
-                  <div className="space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <h1 className="text-4xl md:text-5xl font-black text-primary mb-2">{selectedHostel.name}</h1>
-                        <div className="flex items-center text-on-surface-variant text-lg">
-                          <MapPin className="w-5 h-5 mr-2" />
-                          {selectedHostel.location} • {selectedHostel.university}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-on-surface-variant uppercase tracking-widest">Starting from</div>
-                          <div className="text-3xl font-black text-primary">MK{selectedHostel.price.toLocaleString()}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="bg-surface-container p-4 rounded-2xl text-center">
-                        <Star className="w-6 h-6 text-secondary mx-auto mb-2" />
-                        <div className="text-sm font-bold text-primary">{selectedHostel.rating} Rating</div>
-                      </div>
-                      <div className="bg-surface-container p-4 rounded-2xl text-center">
-                        <ShieldCheck className="w-6 h-6 text-tertiary mx-auto mb-2" />
-                        <div className="text-sm font-bold text-primary">Verified</div>
-                      </div>
-                      <div className="bg-surface-container p-4 rounded-2xl text-center">
-                        <Clock className="w-6 h-6 text-primary mx-auto mb-2" />
-                        <div className="text-sm font-bold text-primary">24/7 Access</div>
-                      </div>
-                      <div className="bg-surface-container p-4 rounded-2xl text-center">
-                        <Zap className="w-6 h-6 text-secondary mx-auto mb-2" />
-                        <div className="text-sm font-bold text-primary">Backup Power</div>
-                      </div>
-                    </div>
-
-                    <div className="prose prose-lg max-w-none">
-                      <h3 className="text-2xl font-bold text-primary mb-4">About this Hostel</h3>
-                      <p className="text-on-surface-variant leading-relaxed">
-                        {selectedHostel.description}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-2xl font-bold text-primary mb-6">Amenities</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {selectedHostel.amenities.map((amenity, i) => (
-                          <div key={`detail-amenity-${i}`} className="flex items-center p-4 bg-surface-container-low rounded-2xl border border-outline-variant/30">
-                            <CheckCircle2 className="w-5 h-5 text-tertiary mr-3" />
-                            <span className="font-semibold text-on-surface-variant">{amenity}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <ReviewSection hostel={selectedHostel} user={user} reviews={reviews} />
-                  </div>
-                </div>
-
-                {(!user || user?.role !== 'landlord') && (
-                  <div className="lg:col-span-1">
-                    <div className="sticky top-24 glass-effect p-8 rounded-[2.5rem] editorial-shadow border border-outline-variant/30 space-y-8">
-                      <h3 className="text-2xl font-bold text-primary">Book Your Room</h3>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">Room Type</label>
-                          <select className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary font-medium">
-                            <option>Single Room (MK{selectedHostel.price.toLocaleString()})</option>
-                            <option>Double Sharing (MK{(selectedHostel.price * 0.7).toLocaleString()})</option>
-                            <option>Four Sharing (MK{(selectedHostel.price * 0.5).toLocaleString()})</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2">Check-in Semester</label>
-                          <select className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary font-medium">
-                            <option>Semester 1, 2026</option>
-                            <option>Semester 2, 2026</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-outline-variant/30 space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant">Monthly Rent</span>
-                          <span className="font-bold text-primary">MK{selectedHostel.price.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant">Booking Fee</span>
-                          <span className="font-bold text-primary">MK{(selectedHostel.bookingFee || AUTOMATIC_BOOKING_FEE).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant">Down Payment (50%)</span>
-                          <span className="font-bold text-primary">MK{(selectedHostel.price * 0.5).toLocaleString()}</span>
-                        </div>
-                        <div className="pt-3 border-t border-outline-variant/30">
-                          <div className="flex justify-between text-lg font-black text-secondary-fixed">
-                            <span>Total Initial Deposit</span>
-                            <span>MK{(selectedHostel.price * 0.5 + (selectedHostel.bookingFee || AUTOMATIC_BOOKING_FEE)).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm font-bold text-on-surface-variant mt-1">
-                            <span>Total Amount to be Paid</span>
-                            <span>MK{(selectedHostel.price + (selectedHostel.bookingFee || AUTOMATIC_BOOKING_FEE)).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button 
-                        onClick={() => handleBooking(selectedHostel)}
-                        className="w-full py-5 rounded-2xl bg-secondary-fixed text-on-secondary-fixed font-black text-lg hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-secondary-fixed/20"
-                      >
-                        Reserve Now
-                      </button>
-                      
-                      <p className="text-center text-xs text-on-surface-variant font-medium">
-                        No payment required today. We'll contact you to verify your student status.
-                      </p>
-
-                      <div className="pt-8 border-t border-outline-variant/30">
-                        <h4 className="font-bold text-primary mb-4 flex items-center">
-                          <MessageSquare className="w-5 h-5 mr-2" />
-                          Have Questions?
-                        </h4>
-                        <form onSubmit={handleSendEnquiry} className="space-y-3">
-                          <textarea 
-                            name="message" 
-                            required 
-                            className="w-full p-4 rounded-xl bg-surface-container border-none focus:ring-2 focus:ring-primary text-sm h-24" 
-                            placeholder="Ask the landlord about availability, rules, etc."
-                          ></textarea>
-                          <button 
-                            type="submit"
-                            className="w-full py-3 rounded-xl bg-surface-container text-primary font-bold hover:bg-surface-container-high transition-colors text-sm"
-                          >
-                            Send Enquiry
-                          </button>
-                        </form>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            <HostelDetailView
+              hostel={selectedHostel}
+              user={user}
+              reviews={reviews}
+              savedHostels={savedHostels}
+              onBack={() => navigateTo('listings')}
+              onViewChange={navigateTo}
+              onSaveHostel={handleSaveHostel}
+              onUnsaveHostel={handleUnsaveHostel}
+              onBooking={handleBooking}
+              onSendEnquiry={handleSendEnquiry}
+            />
           )}
 
           {view === 'profile' && user && (
-            <motion.div
-              key="profile"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12"
-            >
-              <div className="flex justify-between items-center mb-12">
-                <button 
-                  onClick={() => navigateTo('dashboard')}
-                  className="flex items-center text-primary font-bold hover:translate-x-[-4px] transition-transform"
-                >
-                  <ArrowLeft className="w-5 h-5 mr-2" />
-                  Back to Dashboard
-                </button>
-              </div>
-
-              <div className="text-center mb-12">
-                <div className="relative inline-block">
-                  <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden border-4 border-white shadow-xl">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-16 h-16 text-primary" />
-                    )}
-                  </div>
-                  <button className="absolute bottom-4 right-0 p-2 bg-primary text-on-primary rounded-full shadow-lg hover:scale-110 transition-transform">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                </div>
-                <h2 className="text-3xl font-black text-primary">{user.name}</h2>
-                <p className="text-on-surface-variant font-medium uppercase tracking-widest text-sm mt-1">{user.role}</p>
-              </div>
-
-              <div className="bg-white dark:bg-surface-container rounded-[2.5rem] editorial-shadow p-8 md:p-12 border border-outline-variant/30">
-                <form onSubmit={handleUpdateProfile} className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Full Name</label>
-                      <input name="name" type="text" required defaultValue={user.name} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Email Address</label>
-                      <input type="email" disabled defaultValue={user.email} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none opacity-60 cursor-not-allowed" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Phone Number</label>
-                      <input name="phone" type="tel" defaultValue={user.phone} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="+265..." />
-                    </div>
-                    {user.role === 'student' ? (
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">University</label>
-                        <select name="university" defaultValue={user.university} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary">
-                          <option value="">Select University</option>
-                          {UNIVERSITIES.map(uni => <option key={uni} value={uni}>{uni}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Business Address</label>
-                        <input name="address" type="text" defaultValue={user.address} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary" placeholder="Office location" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Bio / Description</label>
-                    <textarea name="bio" defaultValue={user.bio} className="w-full p-4 rounded-xl bg-surface-container dark:bg-surface-container-high border-none focus:ring-2 focus:ring-primary h-32" placeholder="Tell us a bit about yourself..."></textarea>
-                  </div>
-
-                  <div className="pt-4">
-                    <button type="submit" className="w-full py-5 rounded-2xl bg-primary text-on-primary font-black text-lg hover-lift interactive-scale shadow-xl">
-                      Save Profile Changes
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
+            <ProfileFormView user={user} onUpdateProfile={handleUpdateProfile} onBack={() => navigateTo('dashboard')} />
           )}
-        </AnimatePresence>
+          </AnimatePresence>
+        </Suspense>
       </main>
 
-      {view !== 'dashboard' && <Footer onViewChange={navigateTo} isLoggedIn={isLoggedIn} />}
+      {view !== 'dashboard' && <LayoutFooter onViewChange={navigateTo} isLoggedIn={isLoggedIn} />}
     </div>
   );
 }
